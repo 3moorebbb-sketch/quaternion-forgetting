@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quaternion Continual-Learning Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  :root {
+    --bg: #03060b; --panel: rgba(9, 14, 23, 0.86); --line: rgba(255,255,255,0.08); --line2: rgba(255,255,255,0.14);
+    --text: #dbe4ea; --muted: #8b97a6; --faint: #5b6675; --accent: #5ee6c8;
+    --c-sgd: #f87171; --c-wanchor: #fbbf24; --c-oanchor: #60a5fa; --c-replay: #c084fc; --c-togd: #34d399; --c-togdr: #34d399;
+    --floor: #eab308;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  body { background-image: radial-gradient(1200px 600px at 10% -10%, rgba(94,230,200,0.06), transparent 60%), radial-gradient(900px 500px at 110% 10%, rgba(192,132,252,0.05), transparent 60%); min-height: 100vh; }
+  .mono { font-family: 'Space Mono', ui-monospace, monospace; }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); min-width: 0; }
+  h1 { margin: 0; font: 700 17px/1.2 'Space Mono', monospace; letter-spacing: .04em; text-transform: uppercase; color: #fff; }
+  h2 { margin: 0 0 10px; font: 700 11px/1.2 'Space Mono', monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .tag { font: 700 9px 'Space Mono', monospace; padding: 2px 7px; border-radius: 4px; border: 1px solid; letter-spacing: .05em; white-space: nowrap; }
+  .sub { color: var(--muted); font-size: 12.5px; max-width: 980px; margin: 6px 0 0; }
+  .sub b { color: var(--text); font-weight: 600; }
+
+  header.panel { border-left: 3px solid var(--accent); }
+  .head-row { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+  .scoreboard { display: grid; grid-template-columns: repeat(6, minmax(92px, 1fr)); gap: 6px; margin-top: 12px; }
+  .score { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,0.02); }
+  .score .n { font: 700 20px 'Space Mono', monospace; }
+  .score .l { font-size: 10.5px; color: var(--muted); line-height: 1.25; }
+  .score .s { font: 400 10px 'Space Mono', monospace; color: var(--faint); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  button { background: rgba(255,255,255,.05); border: 1px solid var(--line2); color: var(--text); padding: 7px 11px; border-radius: 6px; font: 700 11px 'Space Mono', monospace; letter-spacing: .03em; cursor: pointer; transition: background .15s, border-color .15s; }
+  button:hover:not(:disabled) { background: rgba(255,255,255,.11); }
+  button:disabled { opacity: .3; cursor: not-allowed; }
+  button.primary { background: rgba(94,230,200,.12); border-color: rgba(94,230,200,.5); color: var(--accent); }
+  button.primary:hover:not(:disabled) { background: rgba(94,230,200,.22); }
+  button.danger { color: #fca5a5; border-color: rgba(248,113,113,.35); }
+  .knobs { display: grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap: 8px 16px; flex: 1; min-width: 280px; }
+  .knob label { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-bottom: 3px; gap: 6px; }
+  .knob label span:last-child { font-family: 'Space Mono', monospace; color: var(--text); }
+  input[type=range] { width: 100%; height: 3px; -webkit-appearance: none; appearance: none; background: rgba(255,255,255,.13); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 0; cursor: pointer; }
+  input[type=number], select { background: rgba(255,255,255,.05); border: 1px solid var(--line2); color: var(--text); border-radius: 6px; padding: 5px 7px; font: 12px 'Space Mono', monospace; width: 72px; }
+  select { width: auto; }
+  .status { font: 11px 'Space Mono', monospace; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+  .status b { color: #fff; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .card { border-top: 2px solid var(--mc); display: flex; flex-direction: column; gap: 8px; }
+  .card-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+  .card-title { font: 700 12px 'Space Mono', monospace; color: var(--mc); }
+  .rule { display: block; font: 10px 'Space Mono', monospace; color: var(--faint); margin-top: 2px; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field .cap { font: 9.5px 'Space Mono', monospace; color: var(--muted); text-align: center; }
+  .field canvas { width: 100%; aspect-ratio: 1; border-radius: 5px; border: 1px solid var(--line); background: #000; image-rendering: pixelated; }
+  .readout { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font: 12px 'Space Mono', monospace; }
+  .readout div { display: flex; justify-content: space-between; gap: 6px; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  .readout span:first-child { color: var(--muted); font-size: 10.5px; }
+  .readout b { color: #fff; }
+  .refline { font: 10.5px 'Space Mono', monospace; color: var(--muted); border-top: 1px solid var(--line); padding-top: 6px; }
+  .refline b { color: var(--text); font-weight: 700; }
+  .note { font-size: 11.5px; color: #aab5c2; }
+
+  .row2 { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 12px; }
+  .chart-box { position: relative; width: 100%; height: 240px; }
+  .chart-box canvas { width: 100%; height: 100%; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 10.5px 'Space Mono', monospace; color: var(--muted); margin-top: 8px; }
+  .legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
+  .seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 4px 9px; font-size: 10px; }
+  .seg button.on { background: rgba(94,230,200,.16); color: var(--accent); }
+  .h2row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .h2row h2 { margin: 0; }
+  #three { width: 100%; height: 240px; border-radius: 8px; border: 1px solid var(--line); background: #000; overflow: hidden; position: relative; }
+  .drift { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; font: 10.5px 'Space Mono', monospace; color: var(--muted); margin-top: 8px; }
+  .drift b { color: var(--text); }
+
+  .bench-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 16px; align-items: start; }
+  .progress { height: 6px; border-radius: 3px; background: rgba(255,255,255,.07); overflow: hidden; margin: 8px 0 4px; }
+  .progress div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  table { width: 100%; border-collapse: collapse; font: 11.5px 'Space Mono', monospace; }
+  th { text-align: right; font-weight: 700; font-size: 10px; color: var(--muted); padding: 6px 6px; border-bottom: 1px solid var(--line2); white-space: nowrap; }
+  td { text-align: right; padding: 6px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  td .sd { color: var(--faint); font-size: 10px; }
+  .tbl-scroll { overflow-x: auto; }
+  .pareto-box { position: relative; width: 100%; aspect-ratio: 1.15; }
+  .pareto-box canvas { width: 100%; height: 100%; display: block; }
+
+  .findings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 22px; }
+  .finding { border-left: 2px solid var(--accent); padding: 2px 0 2px 12px; }
+  .finding h3 { margin: 0 0 3px; font-size: 13px; color: #fff; font-weight: 600; }
+  .finding p { margin: 0; font-size: 12.5px; color: #aab5c2; }
+  .finding .num { font-family: 'Space Mono', monospace; color: var(--text); }
+  details.method summary { cursor: pointer; font: 700 11px 'Space Mono', monospace; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  details.method ul { margin: 10px 0 0; padding-left: 18px; color: #aab5c2; font-size: 12.5px; }
+  details.method li { margin-bottom: 4px; }
+  details.method code { font-family: 'Space Mono', monospace; font-size: 11.5px; color: var(--text); }
+
+  .study { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+  .matrix { display: grid; grid-template-columns: 92px 1fr 1fr; gap: 6px; font-family: 'Space Mono', monospace; }
+  .matrix .hd { font-size: 10px; color: var(--muted); text-align: center; align-self: end; padding-bottom: 2px; }
+  .matrix .rh { font-size: 10px; color: var(--muted); align-self: center; text-align: right; padding-right: 4px; line-height: 1.25; }
+  .cell { border-radius: 8px; padding: 9px 8px; text-align: center; border: 1px solid rgba(255,255,255,.1); }
+  .cell .v { font-size: 21px; font-weight: 700; color: #fff; }
+  .cell .s { font-size: 10px; color: rgba(255,255,255,.7); }
+  .effects { margin-top: 10px; font: 10.5px 'Space Mono', monospace; color: var(--muted); display: grid; gap: 3px; }
+  .effects b { color: var(--text); }
+  .verdict { margin: 12px 0 0; padding-left: 18px; font-size: 12.5px; color: #aab5c2; }
+  .verdict li { margin-bottom: 6px; }
+  .verdict b { color: #fff; font-weight: 600; }
+  .heat td.hv { color: #fff; text-align: center; }
+  .heat th { text-align: center; }
+  .heat td .bsub { color: rgba(255,255,255,.6); font-size: 9.5px; display: block; }
+  .knobs.locked { opacity: .3; pointer-events: none; }
+  .tuned-tag { display: block; font: 10px 'Space Mono', monospace; color: var(--accent); margin-top: 2px; }
+  #three .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; font: 11px 'Space Mono', monospace; color: #8b97a6; }
+  @media (max-width: 1180px) { .knobs { grid-template-columns: repeat(3, minmax(110px, 1fr)); } .scoreboard { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 980px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .row2, .bench-grid, .study { grid-template-columns: 1fr; } .findings { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .wrap { padding: 12px 16px; } .cards { grid-template-columns: 1fr; } .knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .scoreboard { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 15px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="panel">
+    <div class="head-row">
+      <div>
+        <h1>Quaternion Continual-Learning Workbench</h1>
+        <p class="sub">Does putting a network's weights on the unit 3-sphere help it remember? The toy setup: a network learns <b>Task A</b> (a circle), then <b>Task B</b> (a diagonal half-plane), and we measure how much of Task A survives. Six update rules and six networks are compared, each starting from a Task A checkpoint at ≥95%. Every number on the page reproduces from its seed.</p>
+      </div>
+      <span class="tag" style="color:var(--accent);border-color:rgba(94,230,200,.45)">v6 · REPRODUCIBLE</span>
+    </div>
+    <div class="mono" style="font-size:10px;color:var(--faint);margin-top:12px">Task A after 1,000 Task B steps · S³ quaternion network, shared defaults · mean of 16 seeds</div>
+    <div class="scoreboard" id="scoreboard" style="margin-top:6px"></div>
+  </header>
+
+  <section class="panel" id="study">
+    <h2>Architecture study · does the quaternion geometry protect Task A?</h2>
+    <div class="study">
+      <div>
+        <div class="mono" style="font-size:10.5px;color:var(--muted);margin-bottom:8px">Task A accuracy when Task B first reaches 95% · plain SGD, lr 0.035 · 24 fresh seeds (13–36), mean ± sd</div>
+        <div class="matrix" id="matrix"></div>
+        <div class="effects" id="effects"></div>
+        <ul class="verdict" id="verdict"></ul>
+      </div>
+      <div>
+        <div class="mono" style="font-size:10.5px;color:var(--muted);margin-bottom:8px">Task A during Task B, plain SGD at each network's tuned lr · mean of 12 seeds</div>
+        <div class="chart-box" style="height:260px"><canvas id="arch-chart"></canvas></div>
+        <div class="legend" id="arch-legend"></div>
+      </div>
+    </div>
+    <div class="mono" style="font-size:10.5px;color:var(--muted);margin:18px 0 6px">Task A at step 1,000 with each method's tuned settings · held-out seeds 7–12 (settings chosen on seeds 1–6) · mean ± sd, Task B below</div>
+    <div class="tbl-scroll"><table class="heat" id="arch-table"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="btns">
+        <label class="mono" style="font-size:10.5px;color:var(--muted)">Network <select id="arch"></select></label>
+        <label class="mono" style="font-size:10.5px;color:var(--muted)">Settings <select id="mode"><option value="manual">Shared defaults (sliders)</option><option value="tuned">Tuned for this network</option></select></label>
+        <label class="mono" style="font-size:10.5px;color:var(--muted)">Seed <input type="number" id="seed" value="1" min="1" max="99999"></label>
+        <button class="primary" id="btn-a">1 · Train Task A</button>
+        <button id="btn-b" disabled>2 · Run Task B</button>
+        <button id="btn-pause" disabled>Pause</button>
+        <button class="danger" id="btn-reset">Reset</button>
+      </div>
+      <div class="knobs" id="knobs">
+        <div class="knob"><label><span>Weight anchor λ</span><span id="v-lambda"></span></label><input type="range" id="k-lambda" min="0" max="20" step="1"></div>
+        <div class="knob"><label><span>Output anchor μ</span><span id="v-mu"></span></label><input type="range" id="k-mu" min="0" max="20" step="1"></div>
+        <div class="knob"><label><span>Replay weight ρ</span><span id="v-rho"></span></label><input type="range" id="k-rho" min="0" max="20" step="1"></div>
+        <div class="knob"><label><span>OGD basis K</span><span id="v-K"></span></label><input type="range" id="k-K" min="1" max="62" step="1"></div>
+        <div class="knob"><label><span>OGD refresh every</span><span id="v-refresh"></span></label><input type="range" id="k-refresh" min="0" max="5" step="1"></div>
+        <div class="knob"><label><span>Learning rate</span><span id="v-lr"></span></label><input type="range" id="k-lr" min="0.005" max="0.08" step="0.005"></div>
+      </div>
+    </div>
+    <div class="status" style="margin-top:10px">
+      <span>Phase <b id="phase">READY</b></span>
+      <span>Step <b id="step">0</b> / 1000</span>
+      <span id="ckpt-info"></span>
+    </div>
+  </section>
+
+  <section class="cards" id="cards"></section>
+
+  <section class="row2">
+    <div class="panel">
+      <div class="h2row">
+        <h2>Live run · accuracy vs Task B step</h2>
+        <div class="seg" id="chart-toggle"><button class="on" data-k="A">Task A</button><button data-k="B">Task B</button></div>
+      </div>
+      <div class="chart-box"><canvas id="chart"></canvas></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="panel">
+      <div class="h2row">
+        <h2>Quaternion weights · drift from checkpoint</h2>
+        <select id="viz-model"></select>
+      </div>
+      <div id="three"></div>
+      <div class="legend" style="margin-top:6px">
+        <span><i style="border-color:#6b7280"></i>checkpoint q*</span>
+        <span><i id="viz-swatch" style="border-color:var(--c-oanchor)"></i>current q</span>
+        <span id="viz-note">P = (q<sub>i</sub>, q<sub>j</sub>, q<sub>k</sub>)/(1+q<sub>r</sub>), q<sub>r</sub> ≥ 0</span>
+      </div>
+      <div class="drift" id="drift"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="h2row">
+      <h2>Multi-seed benchmark · selected network and settings</h2>
+      <div class="btns">
+        <label class="mono" style="font-size:10.5px;color:var(--muted)">Seeds
+          <select id="bench-n"><option>4</option><option selected>8</option><option>16</option></select>
+        </label>
+        <button class="primary" id="btn-bench">Run benchmark</button>
+        <button id="btn-bench-stop" disabled>Stop</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:0">Each seed trains its own Task A checkpoint for the selected network, then runs all six rules for 1,000 steps in background workers. With shared defaults on the S³ network, seeds 1–16 reproduce the reference numbers exactly. With tuned settings, seeds 1–12 reproduce the architecture study. The Pareto plot shows the study's 12-seed grid for this network (every learning rate × knob value; the ringed dot is the tuned choice), with your benchmark overlaid as large markers.</p>
+    <div class="progress"><div id="bench-bar"></div></div>
+    <div class="status" id="bench-status">Not run yet.</div>
+    <div class="bench-grid" style="margin-top:12px">
+      <div class="tbl-scroll"><table id="bench-table"></table></div>
+      <div>
+        <div class="pareto-box"><canvas id="pareto"></canvas></div>
+        <div class="legend" id="pareto-legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Method findings · S³ network, shared defaults, 16 seeds</h2>
+    <div class="findings">
+      <div class="finding"><h3>Protect outputs, not weights</h3><p>At matched Task B accuracy (≥95% at step 1,000), anchoring Task A's <em>outputs</em> on 100 stored inputs keeps <span class="num">96.0 ± 1.4%</span>. Anchoring the <em>weights</em> keeps <span class="num">73.5 ± 7.0%</span>. Raising λ only trades one task for the other: λ = 2 gives <span class="num">92 / 67</span>.</p></div>
+      <div class="finding"><h3>Static OGD decays from linearisation drift, not S³ curvature</h3><p>With a frozen basis, T-OGD ends at <span class="num">55–64%</span> for every K from 1 to 62, even though K = 15 captures 99.8% of the gradient energy. Recomputing the same projection every 10 steps lifts it to <span class="num">95.4 ± 1.3%</span>. Every 50 steps gives <span class="num">84%</span>. On split-head or real networks, static OGD already holds <span class="num">95–97%</span>, so the drift is this large mainly because both tasks share one output.</p></div>
+      <div class="finding"><h3>Replay is the bar, and three methods meet it</h3><p>With 100 stored points, output anchoring, replay and refreshed OGD all land at <span class="num">95–96%</span> on Task A and <span class="num">97–98.5%</span> on B. Refreshed OGD costs about <span class="num">25–45×</span> more compute per step (100 Jacobian rows plus an eigensolve each refresh).</p></div>
+      <div class="finding"><h3>Small memory favours soft targets</h3><p id="mem-finding"></p></div>
+      <div class="finding"><h3>The shared i/j readout is the weak point</h3><p>Both heads read the same output quaternion, so every weight serves both tasks. Unprotected SGD falls to <span class="num">54.3%</span>, below the <span class="num floor-val"></span> this grid gives for predicting "outside" everywhere. The architecture study shows this readout, more than the S³ constraint, drives the forgetting.</p></div>
+      <div class="finding"><h3>Single runs vary</h3><p>Per-seed spread at step 1,000 is <span class="num">±1–2</span> points for the three memory methods and <span class="num">±6–7</span> for the weight anchor and static OGD. One live run can sit 10 points from the mean, so use the benchmark before drawing conclusions.</p></div>
+    </div>
+    <details class="method" style="margin-top:14px">
+      <summary>Protocol and fairness</summary>
+      <ul>
+        <li><b>Network:</b> 1→6→6→1 quaternion neurons. The weight is <code>A·q</code> with <code>‖q‖ = 1</code>, the hidden activation is split-tanh and the output is linear. The heads are <code>z_A = 3.5·out_i</code> and <code>z_B = 3.5·out_j</code>. Backprop was checked against finite differences (max relative error 2e-6).</li>
+        <li><b>Optimiser:</b> q takes an exponential-map step on S³ after tangent projection. A and b take Euclidean steps, with A ≥ 0.01. Task B uses plain Riemannian SGD at lr 0.035 with batch 20.</li>
+        <li><b>Task A checkpoint:</b> trained with Riemannian Adam until the fixed grid reads ≥ 95%, restarting from a fresh init if needed. All 16 reference seeds passed on the first attempt, at 95.3–99.0%.</li>
+        <li><b>Shared memory:</b> each seed stores the same 100 uniform inputs. Replay uses their labels, the output anchor uses the checkpoint logits, and OGD uses the checkpoint's output gradients (static) or the current ones (refreshed). Memory minibatches are 20 points, with indices shared across methods each step.</li>
+        <li><b>Evaluation:</b> a fixed 50×50 grid on [−1, 1]², so readouts carry no sampling noise. Majority floor = <span id="floor-txt"></span>: the share of grid points outside the circle. That's higher than the circle's area fraction (64.7%) because the grid includes the edges and corners. The 50% line is what any half-plane through the origin scores on Task A.</li>
+        <li><b>Knob choice:</b> each method's default is its best Task A accuracy at step 1,000 subject to Task B ≥ 95%, chosen from the sweep in the Pareto plot. The two OGD variants share K = 15, so they differ only in refresh.</li>
+        <li><b>Networks:</b> <span id="arch-list"></span>. The free quaternion networks start from exactly the same function as their S³ counterparts (w = A·q at init). Only the parameterisation and update geometry differ.</li>
+        <li><b>Architecture study:</b> each method's learning rate ∈ {0.0175, 0.035, 0.07} and knob (λ ∈ {0.01, 0.05, 0.2, 1}, μ ∈ {0.01, 0.03, 0.1, 0.3}, ρ ∈ {0.25, 0.5, 1, 2}, static K ∈ {5, 15, 40}; refreshed OGD K = 15 every 10 steps) were chosen on seeds 1–6, by best Task A at step 1,000 subject to Task B ≥ 95%, then reported on held-out seeds 7–12. The SGD 2×2 result was confirmed on fresh seeds 13–36. Every network reached a ≥ 95% checkpoint on every seed. The S³-cost ablations (<code>ablate.js</code>) start every variant from the same S³ split-head checkpoint with the same Task B batches, and compare them paired over seeds 13–36. <code>adam.js</code> repeats the comparisons with Adam for Task B (lr 0.0025–0.01). <code>probe.js</code> fits exact logistic-regression probes on the last hidden layer (2,000 random points, scored on the grid) and refits the readout from the 100-point memory.</li>
+        <li><b>Intervals:</b> 95% percentile bootstrap of the difference in means, 10,000 resamples. One exploratory result, a +2.6-point edge for free split-head quaternions over the 282-parameter MLP, did not replicate on the fresh seeds and is reported as null.</li>
+        <li><b>Seeds:</b> checkpoint RNG = <code>seed·7919+1</code>, memory = <code>+2</code>, Task B stream = <code>seed·104729+3</code> (mulberry32).</li>
+      </ul>
+    </details>
+  </section>
+
+</div>
+
+<script id="qcl-engine">
+// ============================================================================
+// Q-CL ENGINE — continual learning on a 2-task toy problem with pluggable
+// architectures and six Task-B update rules. Pure JS, no DOM; the same file
+// runs in Node (harness), in the page, and in the page's benchmark Worker.
+// Everything is driven by seeded RNGs so (seed, config) reproduces exactly.
+//
+// Architectures
+//   qs3    quaternion MLP, weights A·q with q ∈ S³ (Riemannian updates)   292 params
+//   qfree  same Hamilton-product network, weights w ∈ ℝ⁴ (Euclidean)       244 params
+//          — identical initial function to qs3 (w = A·q); only the geometry differs
+//   qs3sep / qfreesep  same, but 6→2 output quaternions: head A = out₀·i,
+//          head B = out₁·j, so each task has private last-layer weights        326 / 272 params
+//   real14 real tanh MLP 2→14→14→2, parameter-matched                     282 params
+//   real24 real tanh MLP 2→24→24→2, width-matched (24 real activations)   722 params
+// ============================================================================
+var QCL = (function () {
+  'use strict';
+
+  // ---------- RNG ----------
+  function makeRng(seed) {
+    var a = (seed >>> 0) || 1;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function randn(rng) {
+    var u = 0, v = 0;
+    while (u === 0) u = rng();
+    while (v === 0) v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  // ---------- Tasks ----------
+  var R2 = 0.45, LOGIT_SCALE = 3.5;
+  function labelA(x1, x2) { return (x1 * x1 + x2 * x2) < R2 ? 1 : 0; }
+  function labelB(x1, x2) { return (x1 - x2) > 0 ? 1 : 0; }
+  function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
+
+  // Every architecture exposes:
+  //   P, init(rng), forward(th,x1,x2) -> {zA, zB, ...cache}, backward(th, fw, head, c, g)
+  //   (adds c · ∂out_head/∂θ to g, where z_head = LOGIT_SCALE · out_head),
+  //   tangentProject(th, v), applyStep(th, v, lr), anchorGrad(th, ref, lam, g), quatBlocks
+
+  // ======================= qs3 / qfree: quaternion networks =======================
+  // sepHeads: two output quaternion neurons, head A reads out₀·i and head B reads out₁·j,
+  // so each task gets private last-layer weights (as a real MLP's two output rows do).
+  function makeQuaternionArch(constrained, sepHeads) {
+    var LAYERS = [[1, 6], [6, 6], [6, sepHeads ? 2 : 1]], LAYOUT = [], P = 0, li;
+    var IA = 1, IB = sepHeads ? 6 : 2;
+    for (li = 0; li < LAYERS.length; li++) {
+      var inS = LAYERS[li][0], outS = LAYERS[li][1], n = inS * outS;
+      if (constrained) { LAYOUT.push({ inS: inS, outS: outS, n: n, q: P, A: P + 4 * n, b: P + 5 * n }); P += 5 * n + 4 * outS; }
+      else { LAYOUT.push({ inS: inS, outS: outS, n: n, q: P, A: -1, b: P + 4 * n }); P += 4 * n + 4 * outS; }
+    }
+    var NQ = 0, QB = [];
+    for (li = 0; li < LAYOUT.length; li++) { NQ += LAYOUT[li].n; for (var w0 = 0; w0 < LAYOUT[li].n; w0++) QB.push(LAYOUT[li].q + 4 * w0); }
+
+    function init(rng) {
+      var th = new Float64Array(P);
+      for (var l = 0; l < LAYOUT.length; l++) {
+        var L = LAYOUT[l];
+        for (var w = 0; w < L.n; w++) {
+          // Shoemake (1992) uniform unit quaternion
+          var u1 = rng(), u2 = rng() * 2 * Math.PI, u3 = rng() * 2 * Math.PI;
+          var r1 = Math.sqrt(1 - u1), r2 = Math.sqrt(u1), o = L.q + 4 * w;
+          th[o] = r1 * Math.sin(u2); th[o + 1] = r1 * Math.cos(u2);
+          th[o + 2] = r2 * Math.sin(u3); th[o + 3] = r2 * Math.cos(u3);
+          // He-normal magnitude (fan-in counts 4 real components), floored
+          var A = Math.max(0.15, Math.abs(randn(rng) * Math.sqrt(2 / (L.inS * 4))));
+          if (constrained) th[L.A + w] = A;
+          else { th[o] *= A; th[o + 1] *= A; th[o + 2] *= A; th[o + 3] *= A; }
+        }
+      }
+      return th;
+    }
+
+    // Hidden layers: split tanh. Output: linear quaternion; head A reads i, head B reads j.
+    function forward(th, x1, x2) {
+      var inputs = [new Float64Array([0, x1, x2, 0])], acts = [];
+      for (var l = 0; l < LAYOUT.length; l++) {
+        var L = LAYOUT[l], X = inputs[l], Y = new Float64Array(4 * L.outS);
+        for (var o = 0; o < L.outS; o++) {
+          var bo = L.b + 4 * o, s0 = th[bo], s1 = th[bo + 1], s2 = th[bo + 2], s3 = th[bo + 3];
+          for (var i = 0; i < L.inS; i++) {
+            var w = o * L.inS + i, qo = L.q + 4 * w, A = constrained ? th[L.A + w] : 1;
+            var a0 = th[qo], a1 = th[qo + 1], a2 = th[qo + 2], a3 = th[qo + 3];
+            var x0 = X[4 * i], xi = X[4 * i + 1], xj = X[4 * i + 2], xk = X[4 * i + 3];
+            s0 += A * (a0 * x0 - a1 * xi - a2 * xj - a3 * xk);
+            s1 += A * (a0 * xi + a1 * x0 + a2 * xk - a3 * xj);
+            s2 += A * (a0 * xj - a1 * xk + a2 * x0 + a3 * xi);
+            s3 += A * (a0 * xk + a1 * xj - a2 * xi + a3 * x0);
+          }
+          if (l < LAYOUT.length - 1) { s0 = Math.tanh(s0); s1 = Math.tanh(s1); s2 = Math.tanh(s2); s3 = Math.tanh(s3); }
+          Y[4 * o] = s0; Y[4 * o + 1] = s1; Y[4 * o + 2] = s2; Y[4 * o + 3] = s3;
+        }
+        acts.push(Y); inputs.push(Y);
+      }
+      var out = inputs[LAYOUT.length];
+      return { zA: LOGIT_SCALE * out[IA], zB: LOGIT_SCALE * out[IB], inputs: inputs, acts: acts };
+    }
+
+    function backward(th, fw, head, c, g) {
+      var delta = new Float64Array(4 * LAYERS[LAYERS.length - 1][1]); delta[head === 'A' ? IA : IB] = c;
+      for (var l = LAYOUT.length - 1; l >= 0; l--) {
+        var L = LAYOUT[l], X = fw.inputs[l], Y = fw.acts[l], next = new Float64Array(4 * L.inS);
+        for (var o = 0; o < L.outS; o++) {
+          var d0 = delta[4 * o], d1 = delta[4 * o + 1], d2 = delta[4 * o + 2], d3 = delta[4 * o + 3];
+          if (l < LAYOUT.length - 1) {
+            d0 *= 1 - Y[4 * o] * Y[4 * o]; d1 *= 1 - Y[4 * o + 1] * Y[4 * o + 1];
+            d2 *= 1 - Y[4 * o + 2] * Y[4 * o + 2]; d3 *= 1 - Y[4 * o + 3] * Y[4 * o + 3];
+          }
+          var bo = L.b + 4 * o;
+          g[bo] += d0; g[bo + 1] += d1; g[bo + 2] += d2; g[bo + 3] += d3;
+          for (var i = 0; i < L.inS; i++) {
+            var w = o * L.inS + i, qo = L.q + 4 * w, A = constrained ? th[L.A + w] : 1;
+            var a0 = th[qo], a1 = th[qo + 1], a2 = th[qo + 2], a3 = th[qo + 3];
+            var x0 = X[4 * i], xi = X[4 * i + 1], xj = X[4 * i + 2], xk = X[4 * i + 3];
+            if (constrained) {
+              // dL/dA = <d, q x>
+              var p0 = a0 * x0 - a1 * xi - a2 * xj - a3 * xk, p1 = a0 * xi + a1 * x0 + a2 * xk - a3 * xj;
+              var p2 = a0 * xj - a1 * xk + a2 * x0 + a3 * xi, p3 = a0 * xk + a1 * xj - a2 * xi + a3 * x0;
+              g[L.A + w] += d0 * p0 + d1 * p1 + d2 * p2 + d3 * p3;
+            }
+            // dL/dq = A * d * conj(x)
+            g[qo]     += A * (d0 * x0 + d1 * xi + d2 * xj + d3 * xk);
+            g[qo + 1] += A * (-d0 * xi + d1 * x0 - d2 * xk + d3 * xj);
+            g[qo + 2] += A * (-d0 * xj + d1 * xk + d2 * x0 - d3 * xi);
+            g[qo + 3] += A * (-d0 * xk - d1 * xj + d2 * xi + d3 * x0);
+            // dL/dx = A * conj(q) * d
+            next[4 * i]     += A * (a0 * d0 + a1 * d1 + a2 * d2 + a3 * d3);
+            next[4 * i + 1] += A * (a0 * d1 - a1 * d0 - a2 * d3 + a3 * d2);
+            next[4 * i + 2] += A * (a0 * d2 + a1 * d3 - a2 * d0 - a3 * d1);
+            next[4 * i + 3] += A * (a0 * d3 - a1 * d2 + a2 * d1 - a3 * d0);
+          }
+        }
+        delta = next;
+      }
+    }
+
+    // Project the quaternion blocks of a vector onto T_q S³ at the current point.
+    function tangentProject(th, v) {
+      if (!constrained) return;
+      for (var l = 0; l < LAYOUT.length; l++) {
+        var L = LAYOUT[l];
+        for (var w = 0; w < L.n; w++) {
+          var o = L.q + 4 * w;
+          var d = th[o] * v[o] + th[o + 1] * v[o + 1] + th[o + 2] * v[o + 2] + th[o + 3] * v[o + 3];
+          v[o] -= d * th[o]; v[o + 1] -= d * th[o + 1]; v[o + 2] -= d * th[o + 2]; v[o + 3] -= d * th[o + 3];
+        }
+      }
+    }
+
+    // qs3: exponential map on S³ for q (after re-projecting), Euclidean for A (floored) and b.
+    // qfree: plain Euclidean step on everything.
+    function applyStep(th, v, lr) {
+      if (!constrained) { for (var e = 0; e < P; e++) th[e] -= lr * v[e]; return; }
+      tangentProject(th, v);
+      for (var l = 0; l < LAYOUT.length; l++) {
+        var L = LAYOUT[l];
+        for (var w = 0; w < L.n; w++) {
+          var o = L.q + 4 * w, vx = v[o], vy = v[o + 1], vz = v[o + 2], vw = v[o + 3];
+          var nv = Math.sqrt(vx * vx + vy * vy + vz * vz + vw * vw);
+          if (nv > 1e-12) {
+            var c = Math.cos(lr * nv), s = Math.sin(lr * nv) / nv;
+            var q0 = c * th[o] - s * vx, q1 = c * th[o + 1] - s * vy, q2 = c * th[o + 2] - s * vz, q3 = c * th[o + 3] - s * vw;
+            var nq = Math.sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+            th[o] = q0 / nq; th[o + 1] = q1 / nq; th[o + 2] = q2 / nq; th[o + 3] = q3 / nq;
+          }
+          th[L.A + w] = Math.max(0.01, th[L.A + w] - lr * v[L.A + w]);
+        }
+        for (var k = L.b; k < L.b + 4 * L.outS; k++) th[k] -= lr * v[k];
+      }
+    }
+
+    // qs3: λ·[d_S³(q,q*)² + ‖A−A*‖² + ‖b−b*‖²].  qfree: λ·‖θ−θ*‖².
+    function anchorGrad(th, ref, lam, g) {
+      if (!constrained) { for (var e = 0; e < P; e++) g[e] += lam * 2 * (th[e] - ref[e]); return; }
+      for (var l = 0; l < LAYOUT.length; l++) {
+        var L = LAYOUT[l];
+        for (var w = 0; w < L.n; w++) {
+          var o = L.q + 4 * w;
+          var inner = th[o] * ref[o] + th[o + 1] * ref[o + 1] + th[o + 2] * ref[o + 2] + th[o + 3] * ref[o + 3];
+          var sg = inner >= 0 ? 1 : -1, ai = Math.min(Math.abs(inner), 1 - 1e-9);
+          var d = 2 * Math.acos(ai);                // geodesic distance on SO(3) cover
+          var sh = Math.sqrt(1 - ai * ai);
+          // ∂(d²)/∂q (Euclidean); tangent projection happens in applyStep
+          var f = sh > 1e-9 ? -4 * d / sh : -4;
+          for (var c = 0; c < 4; c++) g[o + c] += lam * f * sg * ref[o + c];
+          g[L.A + w] += lam * 2 * (th[L.A + w] - ref[L.A + w]);
+        }
+        for (var k = L.b; k < L.b + 4 * L.outS; k++) g[k] += lam * 2 * (th[k] - ref[k]);
+      }
+    }
+
+    return { P: P, NQ: NQ, quatBlocks: QB, unit: constrained, LAYOUT: LAYOUT, sepHeads: !!sepHeads, init: init, forward: forward, backward: backward,
+             tangentProject: tangentProject, applyStep: applyStep, anchorGrad: anchorGrad };
+  }
+
+  // ======================= real tanh MLP 2 → H → H → 2 =======================
+  function makeRealArch(H) {
+    var W1 = 0, b1 = W1 + 2 * H, W2 = b1 + H, b2 = W2 + H * H, W3 = b2 + H, b3 = W3 + 2 * H, P = b3 + 2;
+    function init(rng) {
+      // LeCun-normal weights (standard for tanh), zero biases
+      var th = new Float64Array(P), i;
+      for (i = 0; i < 2 * H; i++) th[W1 + i] = randn(rng) * Math.sqrt(1 / 2);
+      for (i = 0; i < H * H; i++) th[W2 + i] = randn(rng) * Math.sqrt(1 / H);
+      for (i = 0; i < 2 * H; i++) th[W3 + i] = randn(rng) * Math.sqrt(1 / H);
+      return th;
+    }
+    function forward(th, x1, x2) {
+      var h1 = new Float64Array(H), h2 = new Float64Array(H), j, k;
+      for (j = 0; j < H; j++) h1[j] = Math.tanh(th[W1 + 2 * j] * x1 + th[W1 + 2 * j + 1] * x2 + th[b1 + j]);
+      for (j = 0; j < H; j++) { var s = th[b2 + j], r = W2 + j * H; for (k = 0; k < H; k++) s += th[r + k] * h1[k]; h2[j] = Math.tanh(s); }
+      var o0 = th[b3], o1 = th[b3 + 1];
+      for (k = 0; k < H; k++) { o0 += th[W3 + k] * h2[k]; o1 += th[W3 + H + k] * h2[k]; }
+      return { zA: LOGIT_SCALE * o0, zB: LOGIT_SCALE * o1, x1: x1, x2: x2, h1: h1, h2: h2 };
+    }
+    function backward(th, fw, head, c, g) {
+      var row = head === 'A' ? 0 : 1, d2 = new Float64Array(H), d1 = new Float64Array(H), j, k;
+      g[b3 + row] += c;
+      for (k = 0; k < H; k++) { g[W3 + row * H + k] += c * fw.h2[k]; d2[k] = c * th[W3 + row * H + k] * (1 - fw.h2[k] * fw.h2[k]); }
+      for (j = 0; j < H; j++) {
+        var r = W2 + j * H; g[b2 + j] += d2[j];
+        for (k = 0; k < H; k++) { g[r + k] += d2[j] * fw.h1[k]; d1[k] += d2[j] * th[r + k]; }
+      }
+      for (k = 0; k < H; k++) {
+        var dk = d1[k] * (1 - fw.h1[k] * fw.h1[k]);
+        g[W1 + 2 * k] += dk * fw.x1; g[W1 + 2 * k + 1] += dk * fw.x2; g[b1 + k] += dk;
+      }
+    }
+    return { P: P, NQ: 0, quatBlocks: [], unit: false, init: init, forward: forward, backward: backward,
+             tangentProject: function () {},
+             applyStep: function (th, v, lr) { for (var e = 0; e < P; e++) th[e] -= lr * v[e]; },
+             anchorGrad: function (th, ref, lam, g) { for (var e = 0; e < P; e++) g[e] += lam * 2 * (th[e] - ref[e]); } };
+  }
+
+  var ARCHS = {
+    qs3: makeQuaternionArch(true),
+    qfree: makeQuaternionArch(false),
+    qs3sep: makeQuaternionArch(true, true),
+    qfreesep: makeQuaternionArch(false, true),
+    real14: makeRealArch(14),
+    real24: makeRealArch(24)
+  };
+  var ARCH_INFO = {
+    qs3: { name: 'Quaternion · S³', short: 'Quat S³', desc: 'A·q, q on the unit 3-sphere, Riemannian updates' },
+    qfree: { name: 'Quaternion · free', short: 'Quat free', desc: 'same Hamilton network and init, w ∈ ℝ⁴, Euclidean updates' },
+    qs3sep: { name: 'Quaternion · S³ · split heads', short: 'Quat S³ split', desc: 'as S³, but each task reads its own output quaternion' },
+    qfreesep: { name: 'Quaternion · free · split heads', short: 'Quat free split', desc: 'as free, but each task reads its own output quaternion' },
+    real14: { name: 'Real MLP · 14', short: 'Real 14', desc: '2→14→14→2 tanh, parameter-matched' },
+    real24: { name: 'Real MLP · 24', short: 'Real 24', desc: '2→24→24→2 tanh, width-matched' }
+  };
+  for (var an in ARCHS) ARCH_INFO[an].P = ARCHS[an].P;
+  function arch(name) { var a = ARCHS[name || 'qs3']; if (!a) throw new Error('unknown arch ' + name); return a; }
+
+  // Add the gradient of mean BCE on one head over a batch, times weight.
+  function addBCEGrad(ar, th, pts, head, weight, g) {
+    var n = pts.length;
+    for (var k = 0; k < n; k++) {
+      var p = pts[k], fw = ar.forward(th, p[0], p[1]);
+      var z = head === 'A' ? fw.zA : fw.zB;
+      ar.backward(th, fw, head, weight * LOGIT_SCALE * (sigmoid(z) - p[2]) / n, g);
+    }
+  }
+
+  // ---------- Evaluation on a fixed 50×50 grid (both heads, one forward each) ----------
+  var GRID = [];
+  (function () {
+    for (var gy = 0; gy < 50; gy++) for (var gx = 0; gx < 50; gx++) {
+      var x1 = gx / 49 * 2 - 1, x2 = 1 - gy / 49 * 2;
+      GRID.push([x1, x2, labelA(x1, x2), labelB(x1, x2)]);
+    }
+  })();
+  var MAJORITY_FLOOR = (function () { var c = 0; for (var i = 0; i < GRID.length; i++) c += GRID[i][2]; return 100 * (GRID.length - c) / GRID.length; })();
+
+  function evaluate(th, ar) {
+    ar = ar || ARCHS.qs3;
+    var ca = 0, cb = 0;
+    for (var i = 0; i < GRID.length; i++) {
+      var p = GRID[i], fw = ar.forward(th, p[0], p[1]);
+      if ((fw.zA >= 0 ? 1 : 0) === p[2]) ca++;
+      if ((fw.zB >= 0 ? 1 : 0) === p[3]) cb++;
+    }
+    return [100 * ca / GRID.length, 100 * cb / GRID.length];
+  }
+
+  function sampleBatch(rng, n, labelFn) {
+    var b = [];
+    for (var i = 0; i < n; i++) { var x1 = rng() * 2 - 1, x2 = rng() * 2 - 1; b.push([x1, x2, labelFn(x1, x2)]); }
+    return b;
+  }
+
+  // ---------- Task A pre-training: (Riemannian) Adam, convergence guard ----------
+  // Stepwise so the page can yield between chunks; trainTaskA() just drains it.
+  // Restarts from a fresh init (max 20 attempts) until the fixed grid reads >= 95%.
+  function makeTrainer(rng, ar) {
+    ar = ar || ARCHS.qs3;
+    var P = ar.P, T = { attempts: 0, s: 0, acc: 0, done: false, th: null, m: null, v: null };
+    function restart() {
+      T.attempts++; T.th = ar.init(rng); T.s = 0;
+      T.m = new Float64Array(P); T.v = new Float64Array(P);
+    }
+    function finishAttempt() {
+      T.acc = evaluate(T.th, ar)[0];
+      if (T.acc >= 95 || T.attempts >= 20) T.done = true; else restart();
+    }
+    restart();
+    T.step = function (n) {
+      var b1 = 0.9, b2 = 0.999;
+      for (var c = 0; c < n && !T.done; c++) {
+        var s = ++T.s, th = T.th, m = T.m, v = T.v;
+        var g = new Float64Array(P);
+        addBCEGrad(ar, th, sampleBatch(rng, 32, labelA), 'A', 1, g);
+        ar.tangentProject(th, g);
+        var st = new Float64Array(P);
+        for (var i = 0; i < P; i++) {
+          m[i] = b1 * m[i] + (1 - b1) * g[i]; v[i] = b2 * v[i] + (1 - b2) * g[i] * g[i];
+          st[i] = (m[i] / (1 - Math.pow(b1, s))) / (Math.sqrt(v[i] / (1 - Math.pow(b2, s))) + 1e-8);
+        }
+        ar.applyStep(th, st, 0.035);
+        if (s % 60 === 0) {
+          T.acc = evaluate(th, ar)[0];
+          if (T.acc >= 95 && s >= 180) { finishAttempt(); continue; }
+        }
+        if (s >= 1500) finishAttempt();
+      }
+      return T.done;
+    };
+    T.result = function () { return { th: T.th, acc: T.acc, attempts: T.attempts }; };
+    return T;
+  }
+  function trainTaskA(rng, ar) {
+    var T = makeTrainer(rng, ar);
+    while (!T.step(100)) {}
+    return T.result();
+  }
+
+  // ---------- Episodic memory shared by every memory-based method ----------
+  // M Task-A inputs drawn uniformly at checkpoint time. Replay uses their labels,
+  // output anchoring uses the checkpoint's logits on them, T-OGD uses the
+  // checkpoint's output gradients on them. Same points, same storage budget.
+  function makeMemory(th, rng, M, ar) {
+    ar = ar || ARCHS.qs3;
+    var pts = [];
+    for (var i = 0; i < M; i++) {
+      var x1 = rng() * 2 - 1, x2 = rng() * 2 - 1;
+      pts.push([x1, x2, labelA(x1, x2), ar.forward(th, x1, x2).zA]);
+    }
+    return pts;
+  }
+
+  // Symmetric eigendecomposition (cyclic Jacobi).
+  function jacobiEigen(S, n) {
+    var a = S.slice(), V = new Float64Array(n * n);
+    for (var i = 0; i < n; i++) V[i * n + i] = 1;
+    for (var sweep = 0; sweep < 60; sweep++) {
+      var off = 0;
+      for (var p = 0; p < n; p++) for (var q = p + 1; q < n; q++) off += a[p * n + q] * a[p * n + q];
+      if (off < 1e-22) break;
+      for (p = 0; p < n; p++) for (q = p + 1; q < n; q++) {
+        var apq = a[p * n + q];
+        if (Math.abs(apq) < 1e-300) continue;
+        var theta = (a[q * n + q] - a[p * n + p]) / (2 * apq);
+        var t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        var c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (var k = 0; k < n; k++) {
+          var akp = a[k * n + p], akq = a[k * n + q];
+          a[k * n + p] = c * akp - s * akq; a[k * n + q] = s * akp + c * akq;
+        }
+        for (k = 0; k < n; k++) {
+          var apk = a[p * n + k], aqk = a[q * n + k];
+          a[p * n + k] = c * apk - s * aqk; a[q * n + k] = s * apk + c * aqk;
+        }
+        for (k = 0; k < n; k++) {
+          var vkp = V[k * n + p], vkq = V[k * n + q];
+          V[k * n + p] = c * vkp - s * vkq; V[k * n + q] = s * vkp + c * vkq;
+        }
+      }
+    }
+    var vals = []; for (i = 0; i < n; i++) vals.push(a[i * n + i]);
+    return { vals: vals, V: V };
+  }
+
+  // OGD basis: (tangent-space) output gradients ∇θ zA(x_m) on the memory points,
+  // reduced to the top-K principal directions (SVD via the M×M Gram matrix).
+  function buildOGDBasis(th, mem, K, ar) {
+    ar = ar || ARCHS.qs3;
+    var P = ar.P, M = mem.length, J = [];
+    for (var m = 0; m < M; m++) {
+      var g = new Float64Array(P), fw = ar.forward(th, mem[m][0], mem[m][1]);
+      ar.backward(th, fw, 'A', LOGIT_SCALE, g);
+      ar.tangentProject(th, g);
+      J.push(g);
+    }
+    var G = new Float64Array(M * M);
+    for (var i = 0; i < M; i++) for (var j = i; j < M; j++) {
+      var s = 0; for (var k = 0; k < P; k++) s += J[i][k] * J[j][k];
+      G[i * M + j] = G[j * M + i] = s;
+    }
+    var eg = jacobiEigen(G, M), order = [];
+    for (i = 0; i < M; i++) order.push(i);
+    order.sort(function (a, b) { return eg.vals[b] - eg.vals[a]; });
+    var total = 0; for (i = 0; i < M; i++) total += Math.max(0, eg.vals[i]);
+    var basis = [], captured = 0;
+    for (var r = 0; r < Math.min(K, M); r++) {
+      var idx = order[r], lam = eg.vals[idx];
+      if (lam <= 1e-10 * eg.vals[order[0]]) break;
+      var u = new Float64Array(P);
+      for (m = 0; m < M; m++) { var c = eg.V[m * M + idx]; if (c !== 0) for (k = 0; k < P; k++) u[k] += c * J[m][k]; }
+      var nu = 0; for (k = 0; k < P; k++) nu += u[k] * u[k]; nu = Math.sqrt(nu);
+      for (k = 0; k < P; k++) u[k] /= nu;
+      basis.push(u); captured += lam;
+    }
+    return { basis: basis, energy: total > 0 ? captured / total : 0, rank: order.filter(function (i) { return eg.vals[i] > 1e-10 * eg.vals[order[0]]; }).length };
+  }
+
+  // ---------- Task-B update rules ----------
+  // Every method sees the same Task-B batch each step. Memory methods additionally
+  // draw the same memory minibatch indices (from a shared RNG stream).
+  var METHODS = {
+    sgd: { name: 'Vanilla SGD', knob: null },
+    wanchor: { name: 'Weight anchor', knob: 'λ', note: 'λ·‖θ−θ*‖² (geodesic on S³ for qs3)' },
+    oanchor: { name: 'Output anchor', knob: 'μ', note: 'μ·mean_m (z_A(x_m) − z_A*(x_m))²' },
+    replay: { name: 'Replay', knob: 'ρ', note: 'ρ·BCE_A on stored labelled points' },
+    togd: { name: 'Tangent OGD', knob: 'K', note: 'project ∇ onto ⊥ span(top-K ∇θ z_A), basis frozen at checkpoint' },
+    togdr: { name: 'Tangent OGD, refreshed', knob: 'every', note: 'same projection, basis recomputed at the current θ every N steps' }
+  };
+
+  function stepMethod(ar, method, th, ctx, batchB, memIdx, cfg, lr) {
+    var P = ar.P, g = new Float64Array(P), k, j;
+    addBCEGrad(ar, th, batchB, 'B', 1, g);
+    if (method === 'wanchor') {
+      ar.anchorGrad(th, ctx.ref, cfg.lambda, g);
+    } else if (method === 'oanchor') {
+      var mu = cfg.mu, n = memIdx.length;
+      for (j = 0; j < n; j++) {
+        var p = ctx.mem[memIdx[j]], fw = ar.forward(th, p[0], p[1]);
+        ar.backward(th, fw, 'A', mu * 2 * (fw.zA - p[3]) * LOGIT_SCALE / n, g);
+      }
+    } else if (method === 'replay') {
+      var pts = []; for (j = 0; j < memIdx.length; j++) pts.push(ctx.mem[memIdx[j]]);
+      addBCEGrad(ar, th, pts, 'A', cfg.rho, g);
+    }
+    ar.tangentProject(th, g);
+    if (method === 'togd' || method === 'togdr') {
+      var B = method === 'togd' ? ctx.basis : ctx.basisR;
+      for (var b = 0; b < B.length; b++) {
+        var u = B[b], dot = 0;
+        for (k = 0; k < P; k++) dot += g[k] * u[k];
+        for (k = 0; k < P; k++) g[k] -= dot * u[k];
+      }
+    }
+    ar.applyStep(th, g, lr);
+  }
+
+  // ---------- One full experiment ----------
+  // cfg: {arch, seed, lr, steps, batch, memSize, memBatch, lambda, mu, rho, K, refresh, evalEvery, methods}
+  var DEFAULTS = { arch: 'qs3', seed: 1, lr: 0.035, steps: 1000, batch: 20, memSize: 100, memBatch: 20,
+                   lambda: 0.05, mu: 0.1, rho: 1, K: 15, refresh: 10, evalEvery: 50,
+                   methods: ['sgd', 'wanchor', 'oanchor', 'replay', 'togd', 'togdr'] };
+
+  function setup(cfg, ckpt) {
+    cfg = Object.assign({}, DEFAULTS, cfg || {});
+    var ar = arch(cfg.arch);
+    var rngA = makeRng(cfg.seed * 7919 + 1);
+    var A = ckpt || trainTaskA(rngA, ar);
+    var rngM = makeRng(cfg.seed * 7919 + 2);
+    var mem = makeMemory(A.th, rngM, cfg.memSize, ar);
+    // Static and refreshed OGD may use different K when per-method settings are given
+    var Ks = (cfg.per && cfg.per.togd && cfg.per.togd.K) || cfg.K, Kr = (cfg.per && cfg.per.togdr && cfg.per.togdr.K) || cfg.K;
+    var ogd = buildOGDBasis(A.th, mem, Ks, ar), ogdR = Kr === Ks ? ogd : buildOGDBasis(A.th, mem, Kr, ar);
+    var models = {};
+    for (var i = 0; i < cfg.methods.length; i++) models[cfg.methods[i]] = new Float64Array(A.th);
+    return { cfg: cfg, ar: ar, ckpt: A, ctx: { ref: new Float64Array(A.th), mem: mem, basis: ogd.basis, basisR: ogdR.basis, ogd: ogd },
+             models: models, step: 0, rngB: makeRng(cfg.seed * 104729 + 3), history: [] };
+  }
+
+  function advance(run, nSteps) {
+    var cfg = run.cfg, ar = run.ar;
+    for (var t = 0; t < nSteps && run.step < cfg.steps; t++) {
+      var batchB = sampleBatch(run.rngB, cfg.batch, labelB), memIdx = [];
+      for (var j = 0; j < cfg.memBatch; j++) memIdx.push(Math.floor(run.rngB() * run.ctx.mem.length));
+      for (var i = 0; i < cfg.methods.length; i++) {
+        var mth = cfg.methods[i];
+        stepMethod(ar, mth, run.models[mth], run.ctx, batchB, memIdx, cfg.per && cfg.per[mth] ? Object.assign({}, cfg, cfg.per[mth]) : cfg,
+                   cfg.per && cfg.per[mth] && cfg.per[mth].lr ? cfg.per[mth].lr : cfg.lr);
+      }
+      run.step++;
+      // Refreshed OGD: re-linearise around its *current* parameters on the same memory inputs
+      var pr = (cfg.per && cfg.per.togdr) || {}, every = pr.refresh || cfg.refresh;
+      if (run.models.togdr && run.step % every === 0 && run.step < cfg.steps)
+        run.ctx.basisR = buildOGDBasis(run.models.togdr, run.ctx.mem, pr.K || cfg.K, ar).basis;
+      if (run.step % cfg.evalEvery === 0 || run.step === cfg.steps) record(run);
+    }
+    return run.step >= cfg.steps;
+  }
+
+  function record(run) {
+    var row = { step: run.step };
+    for (var i = 0; i < run.cfg.methods.length; i++) { var m = run.cfg.methods[i]; row[m] = evaluate(run.models[m], run.ar); }
+    run.history.push(row);
+    return row;
+  }
+
+  function runExperiment(cfg, ckpt) {
+    var run = setup(cfg, ckpt); record(run);
+    advance(run, run.cfg.steps);
+    return run;
+  }
+
+  var Q = ARCHS.qs3;
+  return { makeRng: makeRng, labelA: labelA, labelB: labelB, sigmoid: sigmoid, evaluate: evaluate,
+           forward: function (th, x1, x2, an) { return arch(an).forward(th, x1, x2); },
+           trainTaskA: trainTaskA, makeTrainer: makeTrainer, setup: setup, advance: advance, record: record, runExperiment: runExperiment,
+           buildOGDBasis: buildOGDBasis, makeMemory: makeMemory, arch: arch, ARCHS: ARCHS, ARCH_INFO: ARCH_INFO,
+           METHODS: METHODS, DEFAULTS: DEFAULTS, MAJORITY_FLOOR: MAJORITY_FLOOR,
+           LAYOUT: Q.LAYOUT, P: Q.P, NQ: Q.NQ };
+})();
+if (typeof module !== 'undefined') module.exports = QCL;
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var REF = {"pareto":{"sgd":[{"knob":"","A":54.3,"B":98.5}],"wanchor":[{"knob":"0.02","A":67.4,"B":97.5},{"knob":"0.05","A":73.5,"B":95.9},{"knob":"0.1","A":76.7,"B":93.3},{"knob":"0.2","A":79.8,"B":89.7},{"knob":"0.5","A":83.8,"B":81.8},{"knob":"1","A":88.1,"B":74.4},{"knob":"2","A":92.1,"B":66.7}],"oanchor":[{"knob":"0.002","A":83,"B":98},{"knob":"0.005","A":90.7,"B":97.8},{"knob":"0.01","A":94.1,"B":97.6},{"knob":"0.02","A":94.8,"B":97.6},{"knob":"0.05","A":95.2,"B":97.3},{"knob":"0.1","A":96,"B":97.4},{"knob":"0.3","A":94,"B":93.8}],"replay":[{"knob":"0.1","A":90,"B":98.1},{"knob":"0.25","A":94.6,"B":97.5},{"knob":"0.5","A":95,"B":97.5},{"knob":"1","A":95.8,"B":97.4},{"knob":"2","A":95.6,"B":96.9},{"knob":"4","A":91.1,"B":95.1}],"togd":[{"knob":"1","A":55.3,"B":98.4},{"knob":"5","A":56.7,"B":98.6},{"knob":"15","A":60.1,"B":98.7},{"knob":"30","A":60.8,"B":98.3},{"knob":"62","A":64,"B":97.6}],"togdr":[{"knob":"5","A":95.2,"B":98.5},{"knob":"10","A":95.4,"B":98.5},{"knob":"25","A":91,"B":98.6},{"knob":"50","A":84.2,"B":98.7},{"knob":"100","A":79.6,"B":98.6}]},"memory":{"oanchor":[[10,83.2],[25,93.1],[50,94.7],[100,96]],"replay":[[10,76.8],[25,88.7],[50,93.4],[100,95.8]],"togd":[[10,59.2],[25,58.7],[50,59.6],[100,60.1]]},"headline":{"sgd":[[0,96.7,1.1,95.3,99,50.9,5.1],[50,69,6.5,60.8,82.7,95.4,1.9],[100,64.5,4.9,58.6,77.6,96.9,1.7],[150,61.6,4.5,53.5,71.3,97.2,1],[200,60.1,4.1,52.6,68.5,97.7,1.3],[250,59.2,3.8,52.9,66.3,97.8,1.1],[300,58.3,3.5,51.7,63.8,98.1,1],[350,57.4,3.3,51.4,61.9,98.1,0.8],[400,56.8,3.1,51.2,61.4,97.6,0.9],[450,56.5,3,51.2,61.1,97.7,1.5],[500,56,3.2,50.8,62.2,97.8,0.8],[550,55.7,3.1,50.9,61.1,98.1,0.9],[600,55.7,3.1,50.7,61.4,98.3,0.7],[650,55.2,2.8,50.9,60.4,98.1,0.8],[700,55.1,3,50.8,61.4,98.1,0.9],[750,54.8,2.9,50.9,61.4,97.7,1.4],[800,54.6,2.9,50.6,61,98,1.7],[850,54.5,2.9,50.6,61.4,98,1.3],[900,54.6,2.8,50.6,61.1,97.9,1.1],[950,54.3,2.7,50.5,60.7,98.2,0.8],[1000,54.3,2.8,50.4,61.2,98.5,0.9]],"wanchor":[[0,96.7,1.1,95.3,99,50.9,5.1],[50,73.8,7,64.6,88.9,93.8,2.2],[100,73.1,6.3,64.8,89.4,95,2.5],[150,72.8,6.4,65,89.1,95.2,1.8],[200,73,7.2,65,89.6,95.4,1.9],[250,72.7,6.4,65.3,88.5,95.2,2.2],[300,72.6,6.3,65,87.7,95.9,1.3],[350,72.5,6.6,64.9,87.5,95.6,1.5],[400,72.7,6.2,65.1,88.1,95.5,1.8],[450,72.4,6.2,65,87.5,95.7,1.8],[500,72.5,6.1,64.9,87.4,95.9,1.8],[550,72.8,6.4,65.3,86.8,95.5,1.7],[600,73.2,6.7,64.8,85.6,95.5,1.6],[650,73.4,6.6,64.8,86.1,95.9,1.2],[700,72.9,6.5,64.2,86.8,95.3,1.7],[750,72.3,6.2,64.8,86.6,96.1,1.8],[800,73.4,7.3,64.6,87.4,95.2,1.9],[850,73.1,6.8,63.1,87,95.7,2.6],[900,72.7,6.3,64.5,85.7,95.7,1.6],[950,72.5,6.7,64.8,87.4,95.7,2.2],[1000,73.5,7,64.9,87.2,95.9,1.6]],"oanchor":[[0,96.7,1.1,95.3,99,50.9,5.1],[50,93.4,2.7,88.2,96.6,84.4,7.4],[100,94.9,2.4,89.8,98.1,89.7,4.3],[150,94.4,2.4,88,97.6,92.4,3],[200,95,2.6,88.8,98.5,93.9,3.3],[250,95.1,2.4,90,97.7,94,2.4],[300,95.3,1.7,91.2,98,95.3,2.7],[350,95.1,2.7,87.6,97.7,95.9,2.4],[400,95.8,1.4,92.5,98,95.7,1.8],[450,95.4,1.7,91.6,98.2,96.2,2.2],[500,95.6,1.5,91.7,97.5,96.3,2.6],[550,95.6,1.5,92.8,97.4,95.9,1.7],[600,95.4,1.5,92.1,98.2,96.1,1.8],[650,95.1,2.4,88.4,97.9,96.5,3.1],[700,95.8,1.4,92.8,98.6,96.7,1.7],[750,95.5,2.4,87.4,98.2,97,2.4],[800,96.1,1.1,94.5,98.2,97,1.4],[850,95.7,1.5,93.4,98.1,96.6,2.6],[900,95.4,2.2,90.2,97.4,96.4,2.4],[950,95.6,2,91.5,98.4,97.2,0.9],[1000,96,1.4,93.6,98.3,97.4,1.5]],"replay":[[0,96.7,1.1,95.3,99,50.9,5.1],[50,94,2.9,87,96.7,91.9,3.3],[100,94.5,2.1,88.4,97.6,94.5,3.7],[150,94.9,1.7,90.6,97.1,95.3,2.5],[200,95.3,1.7,91.5,97.6,95.8,2.8],[250,95.4,1.2,93,98.1,95.5,2.4],[300,95.4,1.5,92,97.7,96,2.2],[350,95.7,1,93,97,96.2,1.8],[400,95.5,1.7,91.5,98.4,96.1,2.1],[450,95.8,1.4,92.6,97.9,96.4,2.2],[500,94.9,1.5,91.9,97.4,96.3,1.8],[550,95.8,1.6,92.5,98.1,96.8,1.7],[600,95.6,1.6,91.5,98.7,96.5,1.6],[650,95.6,1,93.8,97.1,97,1.3],[700,95.8,1.1,93.9,97.6,97.3,1.1],[750,95.3,1.6,91.2,96.9,97.2,1],[800,95.8,1.5,92.6,98.5,97.2,1.7],[850,95.3,1.8,92.1,97.9,96.9,2.2],[900,95,1.7,90.3,97.6,96.7,2],[950,95.6,1.5,92.4,97.8,96.7,1.7],[1000,95.8,1.7,91.9,98.5,97.4,1.5]],"togd":[[0,96.7,1.1,95.3,99,50.9,5.1],[50,84.3,12.8,66,98.4,88.8,8.3],[100,79.4,14.1,60.4,97.9,94.2,4.3],[150,76.6,13.7,59,96.8,96,2.4],[200,74.4,13.3,57.4,95.3,96.8,1.6],[250,72.6,12.7,56.4,92.8,97.2,1.4],[300,71.1,12,55.8,88.9,97.6,1.4],[350,69.1,10.9,55.2,85.2,98,1.1],[400,67.5,9.8,54.4,82.6,97.7,0.9],[450,66,8.9,54,81.5,97.9,0.8],[500,65,8.4,53.6,79.8,98,0.9],[550,64.1,7.9,53.2,76.4,98,1.2],[600,63.3,7.6,52.6,76.4,98.4,0.5],[650,62.7,7.3,52.5,75,98.3,0.4],[700,62.3,7,52.4,74.3,98.5,0.5],[750,61.8,6.8,52,73.4,98.4,0.5],[800,61.5,6.8,52,73.4,98.7,0.3],[850,61.1,6.7,51.3,73,98.8,0.6],[900,60.6,6.5,51.2,73.2,98.2,0.8],[950,60.4,6.4,51.1,71.7,98.6,0.2],[1000,60.1,6.4,50.7,71.6,98.7,0.4]],"togdr":[[0,96.7,1.1,95.3,99,50.9,5.1],[50,96.4,1.2,93.3,98.3,79.7,9.8],[100,96.4,1.3,93,98.3,90.7,5.8],[150,96.4,1.3,92.9,98.2,94.4,3.4],[200,96.3,1.3,92.9,98.2,95.6,2.8],[250,96.3,1.3,92.9,98.2,96.3,1.9],[300,96.2,1.3,93,98,96.9,2.1],[350,96.1,1.3,92.9,98,97.5,1.4],[400,96.1,1.3,92.9,97.9,97.3,1.2],[450,96.1,1.3,92.9,97.9,97.7,1.4],[500,96.1,1.3,92.8,98,98,0.8],[550,95.9,1.3,92.8,98,98,1.2],[600,95.9,1.2,92.9,97.9,98.2,0.6],[650,95.8,1.2,92.8,97.7,98.3,0.6],[700,95.7,1.3,92.7,97.8,98.5,0.6],[750,95.7,1.3,92.7,97.8,98.5,0.6],[800,95.6,1.3,92.5,97.8,98.6,0.6],[850,95.6,1.3,92.6,97.8,98.6,0.7],[900,95.5,1.3,92.5,97.8,98.1,0.6],[950,95.5,1.3,92.5,97.8,98.5,0.4],[1000,95.4,1.3,92.6,97.7,98.5,0.5]]},"seeds":16};
+  var STUDY = {"archs":{"qs3":{"P":292,"ck":[95.28,98.96],"m":{"sgd":{"lr":0.07,"kv":{},"tuneOK":true,"all":{"A":53.6,"Asd":4.3,"Amin":47.7,"B":97.8},"test":{"A":51.5,"Asd":2.5,"B":98.2},"curve":[[0,96.7,52],[50,63.4,94],[100,61.3,96.2],[150,57.8,97],[200,56.7,97.2],[250,56.5,97.3],[300,56,97.6],[350,55.8,97],[400,54.8,96.8],[450,55.5,97.1],[500,55.2,96.8],[550,54.8,97.4],[600,55,97.2],[650,54.5,97.1],[700,54.3,97.8],[750,54.4,96.8],[800,54.6,97.3],[850,54.2,97.8],[900,54.1,97.5],[950,53.8,97.1],[1000,53.6,97.8]],"grid":[{"lr":0.0175,"kv":{},"A":55.6,"B":98.6},{"lr":0.035,"kv":{},"A":54.1,"B":98.3},{"lr":0.07,"kv":{},"A":53.6,"B":97.8}]},"wanchor":{"lr":0.035,"kv":{"lambda":0.05},"tuneOK":true,"all":{"A":71.2,"Asd":6.1,"Amin":64.9,"B":95.5},"test":{"A":71.2,"Asd":6.2,"B":96},"curve":[[0,96.7,52],[50,71.8,93.3],[100,71.1,94.5],[150,70.6,94.7],[200,70.2,94.9],[250,70.4,94.8],[300,70.1,95.6],[350,69.9,95.3],[400,70.3,95.1],[450,70,95.1],[500,70.1,95.3],[550,70.6,95.3],[600,71.1,95.1],[650,71.5,95.7],[700,70.8,95],[750,70.1,95.5],[800,71.3,94.7],[850,70.8,95.4],[900,70.3,95.5],[950,70,95.8],[1000,71.2,95.5]],"grid":[{"lr":0.0175,"kv":{"lambda":0.01},"A":60.8,"B":98.5},{"lr":0.0175,"kv":{"lambda":0.05},"A":70,"B":96.6},{"lr":0.0175,"kv":{"lambda":0.2},"A":78.3,"B":88.8},{"lr":0.0175,"kv":{"lambda":1},"A":87.3,"B":72.3},{"lr":0.035,"kv":{"lambda":0.01},"A":60.8,"B":98},{"lr":0.035,"kv":{"lambda":0.05},"A":71.2,"B":95.5},{"lr":0.035,"kv":{"lambda":0.2},"A":78.1,"B":88.3},{"lr":0.035,"kv":{"lambda":1},"A":87.2,"B":72.6},{"lr":0.07,"kv":{"lambda":0.01},"A":62.4,"B":96.2},{"lr":0.07,"kv":{"lambda":0.05},"A":71.5,"B":93.5},{"lr":0.07,"kv":{"lambda":0.2},"A":77.5,"B":86.8},{"lr":0.07,"kv":{"lambda":1},"A":86.9,"B":73.2}]},"oanchor":{"lr":0.0175,"kv":{"mu":0.1},"tuneOK":true,"all":{"A":96.2,"Asd":1.4,"Amin":93.8,"B":97.8},"test":{"A":96.3,"Asd":1.6,"B":97.8},"curve":[[0,96.7,52],[50,94.5,79.4],[100,95.1,86.8],[150,95.3,90.3],[200,95.4,92.8],[250,95.4,94.2],[300,95.5,94.7],[350,95.5,95.5],[400,95.8,95.9],[450,95.5,96],[500,95.9,96.7],[550,95.6,96.4],[600,96.3,96.6],[650,96,97.4],[700,95.9,97],[750,96,97.3],[800,95.8,97.5],[850,96,97.6],[900,96,97.3],[950,95.8,97.3],[1000,96.2,97.8]],"grid":[{"lr":0.0175,"kv":{"mu":0.01},"A":93.1,"B":97.3},{"lr":0.0175,"kv":{"mu":0.03},"A":95.6,"B":97.8},{"lr":0.0175,"kv":{"mu":0.1},"A":96.2,"B":97.8},{"lr":0.0175,"kv":{"mu":0.3},"A":96.1,"B":97.4},{"lr":0.035,"kv":{"mu":0.01},"A":94.1,"B":97.4},{"lr":0.035,"kv":{"mu":0.03},"A":95.5,"B":97.5},{"lr":0.035,"kv":{"mu":0.1},"A":95.9,"B":97.5},{"lr":0.035,"kv":{"mu":0.3},"A":95.1,"B":94.2},{"lr":0.07,"kv":{"mu":0.01},"A":93.5,"B":96.5},{"lr":0.07,"kv":{"mu":0.03},"A":95,"B":96.6},{"lr":0.07,"kv":{"mu":0.1},"A":95.4,"B":96.4},{"lr":0.07,"kv":{"mu":0.3},"A":78.9,"B":75.7}]},"replay":{"lr":0.0175,"kv":{"rho":2},"tuneOK":true,"all":{"A":96.6,"Asd":1.7,"Amin":93.4,"B":97.2},"test":{"A":96.3,"Asd":1.7,"B":97.5},"curve":[[0,96.7,52],[50,94.2,85.2],[100,94.8,90.8],[150,95.3,93.5],[200,95.6,94.6],[250,95.4,94.5],[300,95.7,95.4],[350,96.1,95.6],[400,96.2,95.5],[450,95.9,95.8],[500,95.8,96],[550,96.3,96.4],[600,96.4,96.9],[650,96,96.8],[700,96.2,96.6],[750,95.9,96.9],[800,96.3,97.2],[850,96.2,97.4],[900,96.2,97.3],[950,96.4,97],[1000,96.6,97.2]],"grid":[{"lr":0.0175,"kv":{"rho":0.25},"A":93.7,"B":97.8},{"lr":0.0175,"kv":{"rho":0.5},"A":95.5,"B":97.4},{"lr":0.0175,"kv":{"rho":1},"A":96.1,"B":97.4},{"lr":0.0175,"kv":{"rho":2},"A":96.6,"B":97.2},{"lr":0.035,"kv":{"rho":0.25},"A":94.5,"B":97.2},{"lr":0.035,"kv":{"rho":0.5},"A":94.8,"B":97.2},{"lr":0.035,"kv":{"rho":1},"A":95.8,"B":97.3},{"lr":0.035,"kv":{"rho":2},"A":95.4,"B":96.8},{"lr":0.07,"kv":{"rho":0.25},"A":94,"B":96.8},{"lr":0.07,"kv":{"rho":0.5},"A":94.8,"B":96.2},{"lr":0.07,"kv":{"rho":1},"A":94.8,"B":96.6},{"lr":0.07,"kv":{"rho":2},"A":91.9,"B":96}]},"togd":{"lr":0.0175,"kv":{"K":40},"tuneOK":true,"all":{"A":68,"Asd":14.1,"Amin":52.1,"B":95.4},"test":{"A":71.5,"Asd":14.6,"B":93.7},"curve":[[0,96.7,52],[50,96.6,53.2],[100,91.9,62.1],[150,87.4,72.3],[200,84.3,78.9],[250,81.7,82.5],[300,79.3,87.6],[350,77,90.9],[400,75.5,92.1],[450,73.9,92.8],[500,72.6,93.3],[550,72,93.7],[600,71.4,94.4],[650,70.8,94.6],[700,70,94.7],[750,69.5,94.9],[800,69.2,95],[850,68.9,95.3],[900,68.5,95.1],[950,68.2,95.3],[1000,68,95.4]],"grid":[{"lr":0.0175,"kv":{"K":5},"A":61.2,"B":98.3},{"lr":0.0175,"kv":{"K":15},"A":64.2,"B":98.6},{"lr":0.0175,"kv":{"K":40},"A":68,"B":95.4},{"lr":0.035,"kv":{"K":5},"A":56.7,"B":98.6},{"lr":0.035,"kv":{"K":15},"A":59.1,"B":98.7},{"lr":0.035,"kv":{"K":40},"A":63.6,"B":98.2},{"lr":0.07,"kv":{"K":5},"A":54.7,"B":98.2},{"lr":0.07,"kv":{"K":15},"A":56.4,"B":98.5},{"lr":0.07,"kv":{"K":40},"A":58.3,"B":98.4}]},"togdr":{"lr":0.035,"kv":{"K":15,"refresh":10},"tuneOK":true,"all":{"A":95.2,"Asd":1.4,"Amin":92.6,"B":98.5},"test":{"A":94.8,"Asd":0.9,"B":98.4},"curve":[[0,96.7,52],[50,96.2,76.5],[100,96.1,90],[150,96.1,94.6],[200,96,95.6],[250,96,96.5],[300,95.9,97],[350,95.9,97.5],[400,95.8,97.5],[450,95.8,97.8],[500,95.8,98.1],[550,95.7,98.1],[600,95.7,98.3],[650,95.6,98.4],[700,95.5,98.6],[750,95.5,98.6],[800,95.4,98.6],[850,95.4,98.7],[900,95.3,98.2],[950,95.2,98.6],[1000,95.2,98.5]],"grid":[{"lr":0.0175,"kv":{"K":15,"refresh":10},"A":95.8,"B":98.5},{"lr":0.035,"kv":{"K":15,"refresh":10},"A":95.2,"B":98.5},{"lr":0.07,"kv":{"K":15,"refresh":10},"A":90.3,"B":98.3}]}}},"qs3sep":{"P":326,"ck":[95.6,98.08],"m":{"sgd":{"lr":0.0175,"kv":{},"tuneOK":true,"all":{"A":68.1,"Asd":9,"Amin":59.5,"B":98.8},"test":{"A":66.5,"Asd":9.7,"B":99},"curve":[[0,96.7,58.7],[50,90.2,90.2],[100,85.1,95],[150,82.1,96.5],[200,79.7,97.3],[250,78.2,97.8],[300,76.8,98.1],[350,76.1,98.3],[400,75,98.4],[450,74.2,98.4],[500,73.6,98.4],[550,72.9,98.2],[600,72.4,98.6],[650,71.7,98.6],[700,71,98.5],[750,70.5,98.6],[800,70,98.7],[850,69.7,98.9],[900,68.8,98.5],[950,68.4,98.8],[1000,68.1,98.8]],"grid":[{"lr":0.0175,"kv":{},"A":68.1,"B":98.8},{"lr":0.035,"kv":{},"A":61.9,"B":98.7},{"lr":0.07,"kv":{},"A":56.1,"B":98.2}]},"wanchor":{"lr":0.0175,"kv":{"lambda":0.05},"tuneOK":true,"all":{"A":83.8,"Asd":8.6,"Amin":69.5,"B":97.2},"test":{"A":81.6,"Asd":9.4,"B":97.6},"curve":[[0,96.7,58.7],[50,91.2,88.9],[100,88,93.6],[150,86.3,95],[200,85.4,95.6],[250,85,96],[300,84.6,96.2],[350,84.6,96.4],[400,84.3,96.7],[450,84.2,96.7],[500,84.1,96.9],[550,83.9,96.8],[600,84.1,96.9],[650,84,96.9],[700,84.2,96.6],[750,84.2,96.9],[800,84,97.2],[850,84.1,97.3],[900,83.9,97.2],[950,83.8,97],[1000,83.8,97.2]],"grid":[{"lr":0.0175,"kv":{"lambda":0.01},"A":78.1,"B":98.5},{"lr":0.0175,"kv":{"lambda":0.05},"A":83.8,"B":97.2},{"lr":0.0175,"kv":{"lambda":0.2},"A":90.5,"B":92.8},{"lr":0.0175,"kv":{"lambda":1},"A":95.4,"B":77.9},{"lr":0.035,"kv":{"lambda":0.01},"A":78,"B":98.3},{"lr":0.035,"kv":{"lambda":0.05},"A":83.4,"B":97.1},{"lr":0.035,"kv":{"lambda":0.2},"A":90.6,"B":92.6},{"lr":0.035,"kv":{"lambda":1},"A":95.4,"B":77.5},{"lr":0.07,"kv":{"lambda":0.01},"A":76.4,"B":97.5},{"lr":0.07,"kv":{"lambda":0.05},"A":83.3,"B":96.4},{"lr":0.07,"kv":{"lambda":0.2},"A":90.5,"B":91.9},{"lr":0.07,"kv":{"lambda":1},"A":95.4,"B":75.7}]},"oanchor":{"lr":0.035,"kv":{"mu":0.3},"tuneOK":true,"all":{"A":96.3,"Asd":1,"Amin":94.8,"B":97.6},"test":{"A":96.7,"Asd":0.8,"B":98.3},"curve":[[0,96.7,58.7],[50,88,88.6],[100,92.5,93.1],[150,92.6,94.8],[200,92.7,95.4],[250,95.7,96.4],[300,96,97.1],[350,93.2,97],[400,95.9,96.9],[450,96.4,97.1],[500,96.2,96.8],[550,95.3,96.7],[600,96.2,97.5],[650,96.5,97.3],[700,95.8,97.2],[750,96.5,97.5],[800,96,97.1],[850,96.3,97.6],[900,96.2,97.8],[950,96.1,98],[1000,96.3,97.6]],"grid":[{"lr":0.0175,"kv":{"mu":0.01},"A":94.3,"B":98.7},{"lr":0.0175,"kv":{"mu":0.03},"A":95.6,"B":98.6},{"lr":0.0175,"kv":{"mu":0.1},"A":96.3,"B":98.4},{"lr":0.0175,"kv":{"mu":0.3},"A":96.1,"B":98},{"lr":0.035,"kv":{"mu":0.01},"A":94.7,"B":98.5},{"lr":0.035,"kv":{"mu":0.03},"A":95.9,"B":98.4},{"lr":0.035,"kv":{"mu":0.1},"A":95.9,"B":98.1},{"lr":0.035,"kv":{"mu":0.3},"A":96.3,"B":97.6},{"lr":0.07,"kv":{"mu":0.01},"A":95,"B":98},{"lr":0.07,"kv":{"mu":0.03},"A":95.8,"B":97.6},{"lr":0.07,"kv":{"mu":0.1},"A":95.5,"B":96.8},{"lr":0.07,"kv":{"mu":0.3},"A":95.7,"B":97}]},"replay":{"lr":0.0175,"kv":{"rho":1},"tuneOK":true,"all":{"A":96.5,"Asd":1.3,"Amin":94.3,"B":98.6},"test":{"A":96.3,"Asd":1.6,"B":98.7},"curve":[[0,96.7,58.7],[50,96.7,87.5],[100,96.6,92.5],[150,96.4,94.9],[200,96.4,96.4],[250,96.4,96.9],[300,96.2,97.4],[350,96.1,97.8],[400,96.3,97.8],[450,96.2,98],[500,96.1,97.9],[550,96.3,97.9],[600,96.3,98.3],[650,96.3,98.2],[700,96.2,98.2],[750,96.4,98.2],[800,96.4,98.2],[850,96.2,98.6],[900,96.2,98.4],[950,96.3,98.3],[1000,96.5,98.6]],"grid":[{"lr":0.0175,"kv":{"rho":0.25},"A":95.9,"B":98.8},{"lr":0.0175,"kv":{"rho":0.5},"A":96.5,"B":98.7},{"lr":0.0175,"kv":{"rho":1},"A":96.5,"B":98.6},{"lr":0.0175,"kv":{"rho":2},"A":96.4,"B":98.3},{"lr":0.035,"kv":{"rho":0.25},"A":95.9,"B":98.5},{"lr":0.035,"kv":{"rho":0.5},"A":96.4,"B":98.4},{"lr":0.035,"kv":{"rho":1},"A":96.2,"B":98.2},{"lr":0.035,"kv":{"rho":2},"A":93.1,"B":95.6},{"lr":0.07,"kv":{"rho":0.25},"A":96,"B":98},{"lr":0.07,"kv":{"rho":0.5},"A":95.8,"B":97.5},{"lr":0.07,"kv":{"rho":1},"A":93.1,"B":95.8},{"lr":0.07,"kv":{"rho":2},"A":95.4,"B":97}]},"togd":{"lr":0.0175,"kv":{"K":40},"tuneOK":true,"all":{"A":96.1,"Asd":1.6,"Amin":92.8,"B":97.7},"test":{"A":96.8,"Asd":1.1,"B":97.6},"curve":[[0,96.7,58.7],[50,96.6,81.4],[100,96.5,87.6],[150,96.5,91.4],[200,96.4,93.1],[250,96.4,94.4],[300,96.3,95.1],[350,96.3,95.7],[400,96.2,95.9],[450,96.2,96.3],[500,96.2,96.5],[550,96.2,96.6],[600,96.2,96.6],[650,96.1,97.1],[700,96.1,97.1],[750,96.1,97.1],[800,96.1,97.4],[850,96.1,97.4],[900,96,97.5],[950,96.1,97.6],[1000,96.1,97.7]],"grid":[{"lr":0.0175,"kv":{"K":5},"A":80.1,"B":98.8},{"lr":0.0175,"kv":{"K":15},"A":91.9,"B":98.2},{"lr":0.0175,"kv":{"K":40},"A":96.1,"B":97.7},{"lr":0.035,"kv":{"K":5},"A":71,"B":98.8},{"lr":0.035,"kv":{"K":15},"A":85.3,"B":98.6},{"lr":0.035,"kv":{"K":40},"A":95.7,"B":98.4},{"lr":0.07,"kv":{"K":5},"A":60.6,"B":98.5},{"lr":0.07,"kv":{"K":15},"A":75.7,"B":98.2},{"lr":0.07,"kv":{"K":40},"A":94.5,"B":98.3}]},"togdr":{"lr":0.0175,"kv":{"K":15,"refresh":10},"tuneOK":true,"all":{"A":96.2,"Asd":0.7,"Amin":95.3,"B":98.3},"test":{"A":96.7,"Asd":0.7,"B":98.3},"curve":[[0,96.7,58.7],[50,96.6,84.9],[100,96.5,90.6],[150,96.5,93.2],[200,96.5,94.6],[250,96.4,95.5],[300,96.4,96],[350,96.4,96.5],[400,96.4,96.6],[450,96.4,96.9],[500,96.4,97],[550,96.4,97.2],[600,96.4,97.3],[650,96.4,97.5],[700,96.4,97.6],[750,96.3,97.8],[800,96.3,97.8],[850,96.3,98.1],[900,96.2,98.2],[950,96.2,98.1],[1000,96.2,98.3]],"grid":[{"lr":0.0175,"kv":{"K":15,"refresh":10},"A":96.2,"B":98.3},{"lr":0.035,"kv":{"K":15,"refresh":10},"A":95.9,"B":98.6},{"lr":0.07,"kv":{"K":15,"refresh":10},"A":95.4,"B":98.6}]}}},"qfree":{"P":244,"ck":[95,98.6],"m":{"sgd":{"lr":0.0175,"kv":{},"tuneOK":true,"all":{"A":67.3,"Asd":7.4,"Amin":57.8,"B":98.7},"test":{"A":68.9,"Asd":9.3,"B":98.6},"curve":[[0,96.3,49.9],[50,82.7,93.8],[100,78.8,96],[150,76.5,96.8],[200,75.3,97.3],[250,74.4,97.5],[300,73.6,97.8],[350,72.8,98],[400,72.2,97.9],[450,71.7,98.1],[500,71.2,98.1],[550,70.7,98.2],[600,70.1,98.4],[650,69.9,98.4],[700,69.4,98.4],[750,69,98.5],[800,68.6,98.6],[850,68.2,98.7],[900,67.9,98.6],[950,67.6,98.7],[1000,67.3,98.7]],"grid":[{"lr":0.0175,"kv":{},"A":67.3,"B":98.7},{"lr":0.035,"kv":{},"A":63.2,"B":98.7},{"lr":0.07,"kv":{},"A":58.5,"B":98.3}]},"wanchor":{"lr":0.035,"kv":{"lambda":0.05},"tuneOK":true,"all":{"A":77.7,"Asd":9.4,"Amin":65.2,"B":97.3},"test":{"A":76.7,"Asd":9.7,"B":97.7},"curve":[[0,96.3,49.9],[50,80.2,95],[100,78.3,96.3],[150,77.4,96.8],[200,77.6,97],[250,77.5,96.9],[300,77.8,97.4],[350,77.4,97.3],[400,77.4,96.6],[450,77.6,97],[500,77.5,97.2],[550,77.7,97.1],[600,77.8,97.2],[650,77.8,97.4],[700,77.8,97.3],[750,78,97.2],[800,78,97.5],[850,77.8,97.6],[900,77.9,97.3],[950,77.8,97.6],[1000,77.7,97.3]],"grid":[{"lr":0.0175,"kv":{"lambda":0.01},"A":70.7,"B":98.4},{"lr":0.0175,"kv":{"lambda":0.05},"A":77.8,"B":97.5},{"lr":0.0175,"kv":{"lambda":0.2},"A":84.4,"B":94.8},{"lr":0.0175,"kv":{"lambda":1},"A":89.2,"B":84.7},{"lr":0.035,"kv":{"lambda":0.01},"A":69.1,"B":98.4},{"lr":0.035,"kv":{"lambda":0.05},"A":77.7,"B":97.3},{"lr":0.035,"kv":{"lambda":0.2},"A":84.2,"B":94.1},{"lr":0.035,"kv":{"lambda":1},"A":89,"B":85.4},{"lr":0.07,"kv":{"lambda":0.01},"A":68.2,"B":97.8},{"lr":0.07,"kv":{"lambda":0.05},"A":77,"B":95.9},{"lr":0.07,"kv":{"lambda":0.2},"A":83.5,"B":92.5},{"lr":0.07,"kv":{"lambda":1},"A":88.7,"B":84.9}]},"oanchor":{"lr":0.035,"kv":{"mu":0.3},"tuneOK":true,"all":{"A":91.3,"Asd":11.7,"Amin":66.4,"B":89.9},"test":{"A":86.2,"Asd":15.4,"B":82.4},"curve":[[0,96.3,49.9],[50,84.1,77.5],[100,83.6,85.8],[150,84.1,84.3],[200,83.8,86],[250,85.5,86.1],[300,84.5,85.3],[350,85.7,87.1],[400,84.9,88.4],[450,88.1,84.3],[500,88.1,85],[550,88,85.5],[600,87.8,85.3],[650,88.6,86.1],[700,88.6,86.8],[750,90.9,89],[800,90.6,89.5],[850,91.4,89.6],[900,90.5,89.4],[950,91.1,89.6],[1000,91.3,89.9]],"grid":[{"lr":0.0175,"kv":{"mu":0.01},"A":95.4,"B":98.3},{"lr":0.0175,"kv":{"mu":0.03},"A":95.9,"B":98.1},{"lr":0.0175,"kv":{"mu":0.1},"A":96.1,"B":98},{"lr":0.0175,"kv":{"mu":0.3},"A":96.2,"B":97.8},{"lr":0.035,"kv":{"mu":0.01},"A":95.6,"B":98.4},{"lr":0.035,"kv":{"mu":0.03},"A":96,"B":98.3},{"lr":0.035,"kv":{"mu":0.1},"A":96.1,"B":98.2},{"lr":0.035,"kv":{"mu":0.3},"A":91.3,"B":89.9},{"lr":0.07,"kv":{"mu":0.01},"A":95.7,"B":97.8},{"lr":0.07,"kv":{"mu":0.03},"A":96,"B":97.7},{"lr":0.07,"kv":{"mu":0.1},"A":95.8,"B":97.8},{"lr":0.07,"kv":{"mu":0.3},"A":66.4,"B":50.7}]},"replay":{"lr":0.0175,"kv":{"rho":1},"tuneOK":true,"all":{"A":96.7,"Asd":1,"Amin":95.2,"B":98.4},"test":{"A":96.9,"Asd":1.2,"B":98.6},"curve":[[0,96.3,49.9],[50,95.3,91.4],[100,96,94.8],[150,96.1,96.1],[200,96.2,96.7],[250,96.4,96.9],[300,96.5,97.3],[350,96.5,97.4],[400,96.5,97.3],[450,96.4,97.4],[500,96.4,97.6],[550,96.5,97.5],[600,96.6,97.8],[650,96.6,97.8],[700,96.6,98],[750,96.6,97.9],[800,96.7,98.3],[850,96.5,98.2],[900,96.6,98.2],[950,96.6,98.4],[1000,96.7,98.4]],"grid":[{"lr":0.0175,"kv":{"rho":0.25},"A":96,"B":98.4},{"lr":0.0175,"kv":{"rho":0.5},"A":96.5,"B":98.4},{"lr":0.0175,"kv":{"rho":1},"A":96.7,"B":98.4},{"lr":0.0175,"kv":{"rho":2},"A":96.6,"B":98.3},{"lr":0.035,"kv":{"rho":0.25},"A":96.4,"B":98.4},{"lr":0.035,"kv":{"rho":0.5},"A":96.7,"B":98.4},{"lr":0.035,"kv":{"rho":1},"A":96.6,"B":98.4},{"lr":0.035,"kv":{"rho":2},"A":96.5,"B":98.2},{"lr":0.07,"kv":{"rho":0.25},"A":96.4,"B":97.8},{"lr":0.07,"kv":{"rho":0.5},"A":96.4,"B":97.7},{"lr":0.07,"kv":{"rho":1},"A":96.3,"B":97.7},{"lr":0.07,"kv":{"rho":2},"A":96.1,"B":97.7}]},"togd":{"lr":0.0175,"kv":{"K":5},"tuneOK":true,"all":{"A":77.7,"Asd":11.9,"Amin":51.9,"B":98.7},"test":{"A":80,"Asd":10,"B":98.7},"curve":[[0,96.3,49.9],[50,94.2,90.4],[100,92.3,95.1],[150,90.8,96.3],[200,89.3,97],[250,88,97.2],[300,87.1,97.5],[350,85.8,97.8],[400,84.9,97.7],[450,83.9,97.9],[500,83.2,98],[550,82.4,98.1],[600,81.8,98.3],[650,81.3,98.3],[700,80.8,98.4],[750,80.4,98.3],[800,80,98.5],[850,79.4,98.6],[900,78.9,98.5],[950,78.2,98.6],[1000,77.7,98.7]],"grid":[{"lr":0.0175,"kv":{"K":5},"A":77.7,"B":98.7},{"lr":0.0175,"kv":{"K":15},"A":76.7,"B":98.6},{"lr":0.0175,"kv":{"K":40},"A":73.1,"B":98.3},{"lr":0.035,"kv":{"K":5},"A":69.1,"B":98.8},{"lr":0.035,"kv":{"K":15},"A":70.4,"B":98.8},{"lr":0.035,"kv":{"K":40},"A":69.6,"B":98.7},{"lr":0.07,"kv":{"K":5},"A":63.2,"B":98.3},{"lr":0.07,"kv":{"K":15},"A":65.9,"B":98.6},{"lr":0.07,"kv":{"K":40},"A":66.7,"B":98.8}]},"togdr":{"lr":0.0175,"kv":{"K":15,"refresh":10},"tuneOK":true,"all":{"A":95.6,"Asd":1.2,"Amin":93.5,"B":98.1},"test":{"A":95.9,"Asd":0.8,"B":98.4},"curve":[[0,96.3,49.9],[50,96.1,84.3],[100,96,92.9],[150,95.9,94.9],[200,95.9,96],[250,95.9,96.3],[300,95.8,96.7],[350,95.8,96.9],[400,95.8,97],[450,95.7,97.2],[500,95.7,97.3],[550,95.7,97.5],[600,95.7,97.6],[650,95.7,97.7],[700,95.7,97.8],[750,95.7,97.7],[800,95.7,98.1],[850,95.7,98],[900,95.7,98.1],[950,95.7,98.2],[1000,95.6,98.1]],"grid":[{"lr":0.0175,"kv":{"K":15,"refresh":10},"A":95.6,"B":98.1},{"lr":0.035,"kv":{"K":15,"refresh":10},"A":95.1,"B":98.5},{"lr":0.07,"kv":{"K":15,"refresh":10},"A":93.5,"B":98.6}]}}},"qfreesep":{"P":272,"ck":[95,97.6],"m":{"sgd":{"lr":0.0175,"kv":{},"tuneOK":true,"all":{"A":90.3,"Asd":3.4,"Amin":84.5,"B":98.9},"test":{"A":89.4,"Asd":3.5,"B":99},"curve":[[0,96.4,45.8],[50,95.9,95.9],[100,95.2,97.1],[150,94.7,97.9],[200,94,98],[250,93.7,98.2],[300,93.3,98.3],[350,92.9,98.7],[400,92.6,98.4],[450,92.3,98.5],[500,92.1,98.5],[550,91.9,98.4],[600,91.7,98.6],[650,91.5,98.6],[700,91.3,98.7],[750,91.1,98.6],[800,90.9,98.9],[850,90.8,99],[900,90.6,98.7],[950,90.5,98.8],[1000,90.3,98.9]],"grid":[{"lr":0.0175,"kv":{},"A":90.3,"B":98.9},{"lr":0.035,"kv":{},"A":88.4,"B":98.8},{"lr":0.07,"kv":{},"A":85.2,"B":98.6}]},"wanchor":{"lr":0.0175,"kv":{"lambda":0.2},"tuneOK":true,"all":{"A":95.4,"Asd":1.2,"Amin":93.6,"B":97.2},"test":{"A":95.7,"Asd":1.1,"B":97.4},"curve":[[0,96.4,45.8],[50,96,95.3],[100,95.7,95.8],[150,95.5,96.8],[200,95.4,96.8],[250,95.4,96.6],[300,95.3,96.9],[350,95.3,97.2],[400,95.3,97],[450,95.3,96.8],[500,95.3,96.7],[550,95.4,96.8],[600,95.3,96.7],[650,95.4,97],[700,95.4,97.2],[750,95.4,96.8],[800,95.4,97.5],[850,95.4,97.3],[900,95.4,97],[950,95.3,96.8],[1000,95.4,97.2]],"grid":[{"lr":0.0175,"kv":{"lambda":0.01},"A":91.4,"B":98.8},{"lr":0.0175,"kv":{"lambda":0.05},"A":93.4,"B":98.3},{"lr":0.0175,"kv":{"lambda":0.2},"A":95.4,"B":97.2},{"lr":0.0175,"kv":{"lambda":1},"A":96.3,"B":92.4},{"lr":0.035,"kv":{"lambda":0.01},"A":90.4,"B":98.6},{"lr":0.035,"kv":{"lambda":0.05},"A":93.4,"B":98},{"lr":0.035,"kv":{"lambda":0.2},"A":95.4,"B":96.6},{"lr":0.035,"kv":{"lambda":1},"A":96.3,"B":90.7},{"lr":0.07,"kv":{"lambda":0.01},"A":89.3,"B":98.2},{"lr":0.07,"kv":{"lambda":0.05},"A":93.2,"B":97.2},{"lr":0.07,"kv":{"lambda":0.2},"A":95.3,"B":94.7},{"lr":0.07,"kv":{"lambda":1},"A":96.2,"B":85.9}]},"oanchor":{"lr":0.035,"kv":{"mu":0.1},"tuneOK":true,"all":{"A":96.4,"Asd":1,"Amin":94.9,"B":98.6},"test":{"A":96.7,"Asd":1.1,"B":98.8},"curve":[[0,96.4,45.8],[50,96.1,96.7],[100,96.2,97.6],[150,96.1,97.8],[200,96.1,98],[250,96.2,98.2],[300,96.4,98.2],[350,96.1,98.5],[400,96.2,98],[450,96.2,98.1],[500,96.3,98.2],[550,96.2,98.2],[600,96.2,98.5],[650,96.2,98.4],[700,96.3,98.5],[750,96.2,98.4],[800,96,98.7],[850,96.2,98.9],[900,96.3,98.5],[950,96.3,98.6],[1000,96.4,98.6]],"grid":[{"lr":0.0175,"kv":{"mu":0.01},"A":95.9,"B":98.8},{"lr":0.0175,"kv":{"mu":0.03},"A":96.2,"B":98.8},{"lr":0.0175,"kv":{"mu":0.1},"A":96.3,"B":98.8},{"lr":0.0175,"kv":{"mu":0.3},"A":96.3,"B":98.8},{"lr":0.035,"kv":{"mu":0.01},"A":96,"B":98.6},{"lr":0.035,"kv":{"mu":0.03},"A":96.3,"B":98.6},{"lr":0.035,"kv":{"mu":0.1},"A":96.4,"B":98.6},{"lr":0.035,"kv":{"mu":0.3},"A":86,"B":82.5},{"lr":0.07,"kv":{"mu":0.01},"A":96,"B":98.3},{"lr":0.07,"kv":{"mu":0.03},"A":96.3,"B":98.2},{"lr":0.07,"kv":{"mu":0.1},"A":96.5,"B":98.3},{"lr":0.07,"kv":{"mu":0.3},"A":66.4,"B":50.7}]},"replay":{"lr":0.0175,"kv":{"rho":2},"tuneOK":true,"all":{"A":96.9,"Asd":1,"Amin":95.5,"B":98.7},"test":{"A":97.1,"Asd":1,"B":98.8},"curve":[[0,96.4,45.8],[50,97.2,96],[100,97.2,96.9],[150,97.3,97.6],[200,96.9,97.8],[250,97.2,98.1],[300,97.2,98.2],[350,97.1,98.6],[400,97,98.3],[450,96.9,98.3],[500,97.1,98.4],[550,97,98.3],[600,97,98.5],[650,96.9,98.4],[700,97,98.6],[750,96.9,98.5],[800,96.9,98.8],[850,96.6,98.9],[900,97,98.6],[950,96.9,98.8],[1000,96.9,98.7]],"grid":[{"lr":0.0175,"kv":{"rho":0.25},"A":96.9,"B":98.8},{"lr":0.0175,"kv":{"rho":0.5},"A":97,"B":98.8},{"lr":0.0175,"kv":{"rho":1},"A":97,"B":98.8},{"lr":0.0175,"kv":{"rho":2},"A":96.9,"B":98.7},{"lr":0.035,"kv":{"rho":0.25},"A":96.9,"B":98.7},{"lr":0.035,"kv":{"rho":0.5},"A":96.9,"B":98.6},{"lr":0.035,"kv":{"rho":1},"A":96.8,"B":98.6},{"lr":0.035,"kv":{"rho":2},"A":96.7,"B":98.5},{"lr":0.07,"kv":{"rho":0.25},"A":96.8,"B":98.4},{"lr":0.07,"kv":{"rho":0.5},"A":96.8,"B":98.3},{"lr":0.07,"kv":{"rho":1},"A":96.6,"B":98.3},{"lr":0.07,"kv":{"rho":2},"A":96.5,"B":98.3}]},"togd":{"lr":0.0175,"kv":{"K":15},"tuneOK":true,"all":{"A":96,"Asd":1.1,"Amin":93.2,"B":98.8},"test":{"A":96,"Asd":1.5,"B":98.9},"curve":[[0,96.4,45.8],[50,96.3,95.7],[100,96.3,96.9],[150,96.3,97.6],[200,96.3,97.7],[250,96.3,98],[300,96.3,98.2],[350,96.3,98.5],[400,96.2,98.3],[450,96.2,98.4],[500,96.2,98.4],[550,96.2,98.4],[600,96.2,98.6],[650,96.2,98.5],[700,96.1,98.7],[750,96.1,98.6],[800,96.1,98.9],[850,96.1,98.9],[900,96,98.7],[950,96,98.8],[1000,96,98.8]],"grid":[{"lr":0.0175,"kv":{"K":5},"A":95.2,"B":98.9},{"lr":0.0175,"kv":{"K":15},"A":96,"B":98.8},{"lr":0.0175,"kv":{"K":40},"A":95.9,"B":98.8},{"lr":0.035,"kv":{"K":5},"A":94.3,"B":98.7},{"lr":0.035,"kv":{"K":15},"A":95.6,"B":98.9},{"lr":0.035,"kv":{"K":40},"A":95.4,"B":98.8},{"lr":0.07,"kv":{"K":5},"A":90.4,"B":98.5},{"lr":0.07,"kv":{"K":15},"A":94,"B":98.6},{"lr":0.07,"kv":{"K":40},"A":94.2,"B":98.7}]},"togdr":{"lr":0.0175,"kv":{"K":15,"refresh":10},"tuneOK":true,"all":{"A":96.1,"Asd":1,"Amin":94.3,"B":98.8},"test":{"A":96.2,"Asd":1.1,"B":98.9},"curve":[[0,96.4,45.8],[50,96.3,95.7],[100,96.3,96.8],[150,96.3,97.6],[200,96.3,97.7],[250,96.3,97.9],[300,96.2,98.2],[350,96.2,98.6],[400,96.2,98.3],[450,96.2,98.4],[500,96.2,98.4],[550,96.2,98.3],[600,96.2,98.5],[650,96.2,98.5],[700,96.1,98.7],[750,96.1,98.5],[800,96.1,98.8],[850,96.1,98.9],[900,96.1,98.6],[950,96.1,98.8],[1000,96.1,98.8]],"grid":[{"lr":0.0175,"kv":{"K":15,"refresh":10},"A":96.1,"B":98.8},{"lr":0.035,"kv":{"K":15,"refresh":10},"A":96,"B":98.9},{"lr":0.07,"kv":{"K":15,"refresh":10},"A":95.8,"B":98.6}]}}},"real14":{"P":282,"ck":[95.16,97.76],"m":{"sgd":{"lr":0.0175,"kv":{},"tuneOK":true,"all":{"A":85.6,"Asd":5.5,"Amin":76.2,"B":98.9},"test":{"A":85.6,"Asd":4.3,"B":99},"curve":[[0,96.2,48],[50,93.9,93.3],[100,93,96.1],[150,92.2,97.2],[200,91.4,97.7],[250,90.9,98],[300,90.3,98],[350,89.7,98.4],[400,89.2,98.4],[450,88.8,98.4],[500,88.4,98.6],[550,88,98.4],[600,87.7,98.7],[650,87.4,98.7],[700,87,98.7],[750,86.7,98.6],[800,86.5,98.9],[850,86.3,99],[900,86.1,98.8],[950,85.8,98.9],[1000,85.6,98.9]],"grid":[{"lr":0.0175,"kv":{},"A":85.6,"B":98.9},{"lr":0.035,"kv":{},"A":82.6,"B":99},{"lr":0.07,"kv":{},"A":79.2,"B":98.9}]},"wanchor":{"lr":0.0175,"kv":{"lambda":0.2},"tuneOK":true,"all":{"A":93.5,"Asd":2,"Amin":90.1,"B":96},"test":{"A":93.8,"Asd":1.8,"B":96.7},"curve":[[0,96.2,48],[50,94.4,91.5],[100,94,93.6],[150,93.7,94.7],[200,93.6,94.7],[250,93.5,95.3],[300,93.4,95.1],[350,93.4,95.4],[400,93.4,95.2],[450,93.4,95.3],[500,93.4,95.7],[550,93.4,95.5],[600,93.4,95.4],[650,93.5,95.7],[700,93.4,95.4],[750,93.5,95.4],[800,93.5,95.5],[850,93.5,95.7],[900,93.5,96.2],[950,93.5,95.5],[1000,93.5,96]],"grid":[{"lr":0.0175,"kv":{"lambda":0.01},"A":87,"B":98.8},{"lr":0.0175,"kv":{"lambda":0.05},"A":90.2,"B":98.2},{"lr":0.0175,"kv":{"lambda":0.2},"A":93.5,"B":96},{"lr":0.0175,"kv":{"lambda":1},"A":95.2,"B":86.5},{"lr":0.035,"kv":{"lambda":0.01},"A":85.3,"B":98.9},{"lr":0.035,"kv":{"lambda":0.05},"A":90.1,"B":98.2},{"lr":0.035,"kv":{"lambda":0.2},"A":93.6,"B":95.6},{"lr":0.035,"kv":{"lambda":1},"A":95.1,"B":85.9},{"lr":0.07,"kv":{"lambda":0.01},"A":84.1,"B":98.7},{"lr":0.07,"kv":{"lambda":0.05},"A":90.1,"B":97.8},{"lr":0.07,"kv":{"lambda":0.2},"A":93.5,"B":94},{"lr":0.07,"kv":{"lambda":1},"A":95.1,"B":84.5}]},"oanchor":{"lr":0.0175,"kv":{"mu":0.3},"tuneOK":true,"all":{"A":96.2,"Asd":0.9,"Amin":94.8,"B":98.8},"test":{"A":96.3,"Asd":1,"B":98.8},"curve":[[0,96.2,48],[50,96,93],[100,96,95.8],[150,96,96.7],[200,96,97.4],[250,96.1,97.3],[300,96,97.7],[350,96.1,98.3],[400,96.1,98],[450,96.2,98.2],[500,96.1,98.1],[550,96.1,98.2],[600,96.1,98.5],[650,96.2,98.5],[700,96.2,98.5],[750,96.1,98.4],[800,96.2,98.6],[850,96.1,98.8],[900,96.2,98.6],[950,96.2,98.6],[1000,96.2,98.8]],"grid":[{"lr":0.0175,"kv":{"mu":0.01},"A":94.8,"B":98.9},{"lr":0.0175,"kv":{"mu":0.03},"A":95.7,"B":98.9},{"lr":0.0175,"kv":{"mu":0.1},"A":96.1,"B":98.8},{"lr":0.0175,"kv":{"mu":0.3},"A":96.2,"B":98.8},{"lr":0.035,"kv":{"mu":0.01},"A":95.2,"B":99},{"lr":0.035,"kv":{"mu":0.03},"A":95.9,"B":99},{"lr":0.035,"kv":{"mu":0.1},"A":96.1,"B":98.9},{"lr":0.035,"kv":{"mu":0.3},"A":95.7,"B":98.9},{"lr":0.07,"kv":{"mu":0.01},"A":95.5,"B":98.9},{"lr":0.07,"kv":{"mu":0.03},"A":96,"B":98.8},{"lr":0.07,"kv":{"mu":0.1},"A":96.2,"B":98.8},{"lr":0.07,"kv":{"mu":0.3},"A":66.4,"B":50.7}]},"replay":{"lr":0.0175,"kv":{"rho":1},"tuneOK":true,"all":{"A":97.2,"Asd":0.9,"Amin":95.8,"B":98.9},"test":{"A":97,"Asd":0.9,"B":99},"curve":[[0,96.2,48],[50,97.5,93.1],[100,97.5,95.9],[150,97.6,97.2],[200,97.5,97.6],[250,97.6,97.8],[300,97.6,97.9],[350,97.5,98.3],[400,97.4,98.3],[450,97.5,98.3],[500,97.5,98.5],[550,97.4,98.4],[600,97.5,98.6],[650,97.4,98.6],[700,97.4,98.6],[750,97.3,98.5],[800,97.3,98.8],[850,97.2,98.9],[900,97.3,98.7],[950,97.2,98.9],[1000,97.2,98.9]],"grid":[{"lr":0.0175,"kv":{"rho":0.25},"A":97.2,"B":98.9},{"lr":0.0175,"kv":{"rho":0.5},"A":97.3,"B":98.9},{"lr":0.0175,"kv":{"rho":1},"A":97.2,"B":98.9},{"lr":0.0175,"kv":{"rho":2},"A":97,"B":98.9},{"lr":0.035,"kv":{"rho":0.25},"A":96.9,"B":99},{"lr":0.035,"kv":{"rho":0.5},"A":97.1,"B":99},{"lr":0.035,"kv":{"rho":1},"A":96.9,"B":99},{"lr":0.035,"kv":{"rho":2},"A":96.5,"B":99},{"lr":0.07,"kv":{"rho":0.25},"A":96.7,"B":98.9},{"lr":0.07,"kv":{"rho":0.5},"A":96.8,"B":98.9},{"lr":0.07,"kv":{"rho":1},"A":96.5,"B":98.9},{"lr":0.07,"kv":{"rho":2},"A":96.2,"B":98.8}]},"togd":{"lr":0.035,"kv":{"K":15},"tuneOK":true,"all":{"A":95.8,"Asd":1.4,"Amin":93.9,"B":99},"test":{"A":95.2,"Asd":1.3,"B":99},"curve":[[0,96.2,48],[50,96.1,95.8],[100,96.1,97.3],[150,96.1,97.7],[200,96,98],[250,96,98],[300,96,98.3],[350,96,98.6],[400,96,98.4],[450,96,98.4],[500,96,98.5],[550,96,98.4],[600,96,98.7],[650,96,98.6],[700,95.9,98.7],[750,95.9,98.7],[800,95.9,98.8],[850,95.9,99],[900,95.8,98.7],[950,95.8,99],[1000,95.8,99]],"grid":[{"lr":0.0175,"kv":{"K":5},"A":93.3,"B":98.9},{"lr":0.0175,"kv":{"K":15},"A":96,"B":98.8},{"lr":0.0175,"kv":{"K":40},"A":96.3,"B":98.8},{"lr":0.035,"kv":{"K":5},"A":92.5,"B":99},{"lr":0.035,"kv":{"K":15},"A":95.8,"B":99},{"lr":0.035,"kv":{"K":40},"A":96.2,"B":99},{"lr":0.07,"kv":{"K":5},"A":90.6,"B":98.9},{"lr":0.07,"kv":{"K":15},"A":95.1,"B":99},{"lr":0.07,"kv":{"K":40},"A":95.9,"B":99}]},"togdr":{"lr":0.035,"kv":{"K":15,"refresh":10},"tuneOK":true,"all":{"A":96.1,"Asd":1.1,"Amin":94.3,"B":98.9},"test":{"A":96.2,"Asd":1.2,"B":98.9},"curve":[[0,96.2,48],[50,96.1,95.7],[100,96.2,97.2],[150,96.2,97.6],[200,96.1,97.9],[250,96.1,98],[300,96.1,98.2],[350,96.1,98.6],[400,96.1,98.4],[450,96.1,98.4],[500,96.1,98.5],[550,96.1,98.4],[600,96.1,98.7],[650,96.1,98.6],[700,96.1,98.7],[750,96.1,98.6],[800,96.1,98.8],[850,96.1,98.9],[900,96.1,98.7],[950,96.1,98.9],[1000,96.1,98.9]],"grid":[{"lr":0.0175,"kv":{"K":15,"refresh":10},"A":96.1,"B":98.8},{"lr":0.035,"kv":{"K":15,"refresh":10},"A":96.1,"B":98.9},{"lr":0.07,"kv":{"K":15,"refresh":10},"A":96,"B":98.9}]}}},"real24":{"P":722,"ck":[95.36,98.64],"m":{"sgd":{"lr":0.0175,"kv":{},"tuneOK":true,"all":{"A":89.1,"Asd":3.5,"Amin":85,"B":98.9},"test":{"A":88.7,"Asd":4.1,"B":98.8},"curve":[[0,96.7,51.8],[50,95.9,93.9],[100,95.2,96],[150,94.6,97.1],[200,94,97.5],[250,93.4,97.7],[300,92.9,98],[350,92.4,98.2],[400,92,98.2],[450,91.6,98.4],[500,91.3,98.3],[550,91,98.6],[600,90.7,98.6],[650,90.5,98.6],[700,90.3,98.7],[750,90.1,98.6],[800,89.8,98.8],[850,89.6,98.9],[900,89.4,98.8],[950,89.3,98.9],[1000,89.1,98.9]],"grid":[{"lr":0.0175,"kv":{},"A":89.1,"B":98.9},{"lr":0.035,"kv":{},"A":86.5,"B":99},{"lr":0.07,"kv":{},"A":83.5,"B":98.9}]},"wanchor":{"lr":0.0175,"kv":{"lambda":0.2},"tuneOK":true,"all":{"A":95.6,"Asd":1.5,"Amin":93,"B":95.6},"test":{"A":95,"Asd":1.6,"B":95.6},"curve":[[0,96.7,51.8],[50,96.1,92.3],[100,95.9,94],[150,95.6,94.9],[200,95.5,95.1],[250,95.5,95.1],[300,95.4,95.8],[350,95.5,95.4],[400,95.4,95.5],[450,95.4,95.7],[500,95.5,95.5],[550,95.5,95.9],[600,95.5,95.9],[650,95.5,95.6],[700,95.5,95.4],[750,95.5,95.6],[800,95.5,95.1],[850,95.5,95.6],[900,95.5,95.8],[950,95.5,95.5],[1000,95.6,95.6]],"grid":[{"lr":0.0175,"kv":{"lambda":0.01},"A":90.1,"B":98.8},{"lr":0.0175,"kv":{"lambda":0.05},"A":92.8,"B":98.2},{"lr":0.0175,"kv":{"lambda":0.2},"A":95.6,"B":95.6},{"lr":0.0175,"kv":{"lambda":1},"A":96.4,"B":86.4},{"lr":0.035,"kv":{"lambda":0.01},"A":88.7,"B":98.8},{"lr":0.035,"kv":{"lambda":0.05},"A":92.6,"B":97.8},{"lr":0.035,"kv":{"lambda":0.2},"A":95.5,"B":94.6},{"lr":0.035,"kv":{"lambda":1},"A":96.4,"B":84.7},{"lr":0.07,"kv":{"lambda":0.01},"A":87.7,"B":98.4},{"lr":0.07,"kv":{"lambda":0.05},"A":92.2,"B":96.8},{"lr":0.07,"kv":{"lambda":0.2},"A":95.4,"B":92.4},{"lr":0.07,"kv":{"lambda":1},"A":96.3,"B":83.4}]},"oanchor":{"lr":0.0175,"kv":{"mu":0.3},"tuneOK":true,"all":{"A":96.7,"Asd":1,"Amin":95.3,"B":98.8},"test":{"A":96.3,"Asd":0.7,"B":98.8},"curve":[[0,96.7,51.8],[50,96.7,93.8],[100,96.7,95.8],[150,96.7,97],[200,96.7,97.5],[250,96.7,97.5],[300,96.7,97.9],[350,96.7,98],[400,96.7,98],[450,96.7,98.2],[500,96.7,98.3],[550,96.7,98.4],[600,96.7,98.5],[650,96.7,98.5],[700,96.7,98.5],[750,96.7,98.6],[800,96.7,98.7],[850,96.7,98.7],[900,96.7,98.6],[950,96.7,98.6],[1000,96.7,98.8]],"grid":[{"lr":0.0175,"kv":{"mu":0.01},"A":96.2,"B":98.8},{"lr":0.0175,"kv":{"mu":0.03},"A":96.4,"B":98.8},{"lr":0.0175,"kv":{"mu":0.1},"A":96.6,"B":98.8},{"lr":0.0175,"kv":{"mu":0.3},"A":96.7,"B":98.8},{"lr":0.035,"kv":{"mu":0.01},"A":96.4,"B":99},{"lr":0.035,"kv":{"mu":0.03},"A":96.5,"B":98.9},{"lr":0.035,"kv":{"mu":0.1},"A":96.6,"B":98.9},{"lr":0.035,"kv":{"mu":0.3},"A":91.7,"B":90.8},{"lr":0.07,"kv":{"mu":0.01},"A":96.4,"B":98.8},{"lr":0.07,"kv":{"mu":0.03},"A":96.5,"B":98.7},{"lr":0.07,"kv":{"mu":0.1},"A":96.6,"B":98.7},{"lr":0.07,"kv":{"mu":0.3},"A":66.4,"B":50.7}]},"replay":{"lr":0.0175,"kv":{"rho":0.5},"tuneOK":true,"all":{"A":97,"Asd":1,"Amin":94.9,"B":98.9},"test":{"A":97,"Asd":1.3,"B":98.8},"curve":[[0,96.7,51.8],[50,97.2,94],[100,97.3,96.1],[150,97.3,97.2],[200,97.3,97.5],[250,97.3,97.7],[300,97.3,98],[350,97.2,98.1],[400,97.2,98.1],[450,97.2,98.3],[500,97.2,98.4],[550,97.1,98.6],[600,97.2,98.6],[650,97.1,98.6],[700,97.1,98.6],[750,97.1,98.6],[800,97.1,98.8],[850,96.9,98.9],[900,97,98.7],[950,97.1,98.8],[1000,97,98.9]],"grid":[{"lr":0.0175,"kv":{"rho":0.25},"A":97,"B":98.9},{"lr":0.0175,"kv":{"rho":0.5},"A":97,"B":98.9},{"lr":0.0175,"kv":{"rho":1},"A":97,"B":98.8},{"lr":0.0175,"kv":{"rho":2},"A":96.8,"B":98.9},{"lr":0.035,"kv":{"rho":0.25},"A":96.9,"B":98.9},{"lr":0.035,"kv":{"rho":0.5},"A":96.9,"B":98.9},{"lr":0.035,"kv":{"rho":1},"A":96.8,"B":98.9},{"lr":0.035,"kv":{"rho":2},"A":96.5,"B":98.9},{"lr":0.07,"kv":{"rho":0.25},"A":96.7,"B":98.8},{"lr":0.07,"kv":{"rho":0.5},"A":96.5,"B":98.8},{"lr":0.07,"kv":{"rho":1},"A":96.3,"B":98.8},{"lr":0.07,"kv":{"rho":2},"A":96,"B":98.7}]},"togd":{"lr":0.035,"kv":{"K":40},"tuneOK":true,"all":{"A":96.7,"Asd":0.8,"Amin":95.4,"B":98.9},"test":{"A":96.3,"Asd":0.4,"B":98.9},"curve":[[0,96.7,51.8],[50,96.8,95.6],[100,96.7,96.9],[150,96.7,97.5],[200,96.7,97.9],[250,96.7,98],[300,96.7,98.2],[350,96.7,98.4],[400,96.7,98.2],[450,96.7,98.3],[500,96.7,98.4],[550,96.7,98.5],[600,96.7,98.8],[650,96.7,98.6],[700,96.7,98.7],[750,96.7,98.6],[800,96.7,98.7],[850,96.7,98.9],[900,96.7,98.6],[950,96.7,98.8],[1000,96.7,98.9]],"grid":[{"lr":0.0175,"kv":{"K":5},"A":95.1,"B":98.9},{"lr":0.0175,"kv":{"K":15},"A":96.4,"B":98.8},{"lr":0.0175,"kv":{"K":40},"A":96.7,"B":98.8},{"lr":0.035,"kv":{"K":5},"A":94.2,"B":99},{"lr":0.035,"kv":{"K":15},"A":96,"B":99},{"lr":0.035,"kv":{"K":40},"A":96.7,"B":98.9},{"lr":0.07,"kv":{"K":5},"A":92.8,"B":98.9},{"lr":0.07,"kv":{"K":15},"A":95.3,"B":98.9},{"lr":0.07,"kv":{"K":40},"A":96.5,"B":98.8}]},"togdr":{"lr":0.0175,"kv":{"K":15,"refresh":10},"tuneOK":true,"all":{"A":96.5,"Asd":0.9,"Amin":94.8,"B":98.8},"test":{"A":96.2,"Asd":0.8,"B":98.8},"curve":[[0,96.7,51.8],[50,96.7,93.7],[100,96.7,95.8],[150,96.7,97],[200,96.7,97.5],[250,96.7,97.5],[300,96.7,97.9],[350,96.6,98.1],[400,96.6,98],[450,96.6,98.3],[500,96.6,98.3],[550,96.6,98.5],[600,96.6,98.6],[650,96.6,98.5],[700,96.6,98.5],[750,96.6,98.6],[800,96.5,98.7],[850,96.5,98.8],[900,96.6,98.7],[950,96.5,98.7],[1000,96.5,98.8]],"grid":[{"lr":0.0175,"kv":{"K":15,"refresh":10},"A":96.5,"B":98.8},{"lr":0.035,"kv":{"K":15,"refresh":10},"A":96.4,"B":99},{"lr":0.07,"kv":{"K":15,"refresh":10},"A":96.2,"B":98.9}]}}}},"confirm":{"qs3":{"hit":[71.49833333333332,7.706611315683081],"fin":[54.86499999999999,4.07699484381839],"step":48.75,"n":24},"qs3sep":{"hit":[86.21833333333335,9.364383805567297],"fin":[72.38833333333334,10.313968437392866],"step":80,"n":24},"qfree":{"hit":[72.33,8.547168358966713],"fin":[58.49499999999998,4.1359642164796355],"step":40.416666666666664,"n":24},"qfreesep":{"hit":[95.015,1.6737279400760767],"fin":[85.16166666666668,6.962752870541355],"step":27.916666666666668,"n":24},"real14":{"hit":[95.31333333333335,1.893978253092788],"fin":[85.33333333333333,4.950631638810184],"step":46.25,"n":24},"real24":{"hit":[95.31166666666667,1.843172281142219],"fin":[86.32999999999998,3.4997689364721865],"step":40.416666666666664,"n":24},"pairs":[{"a":"qs3sep","b":"qs3","lab":"split heads, on S³","d":14.720000000000027,"ci":[9.540000000000006,19.186666666666667]},{"a":"qfreesep","b":"qfree","lab":"split heads, free","d":22.685000000000002,"ci":[19.040000000000006,25.976666666666702]},{"a":"qfree","b":"qs3","lab":"drop S³, shared head","d":0.8316666666666777,"ci":[-4.158333333333289,5.258333333333326]},{"a":"qfreesep","b":"qs3sep","lab":"drop S³, split heads","d":8.796666666666653,"ci":[5.144999999999968,12.708333333333314]},{"a":"qfreesep","b":"qs3","lab":"both","d":23.51666666666668,"ci":[20.188333333333347,26.435000000000002]},{"a":"qfreesep","b":"real14","lab":"vs real, param-matched","d":-0.2983333333333462,"ci":[-1.2200000000000273,0.7283333333333104]},{"a":"qfreesep","b":"real24","lab":"vs real, width-matched","d":-0.29666666666666686,"ci":[-1.154999999999987,0.791666666666643]}]},"explore":{"qs3":{"hit":66.8,"hitsd":4.1,"fin":54.1},"qs3sep":{"hit":83.5,"hitsd":10.4,"fin":61.9},"qfree":{"hit":79.1,"hitsd":8,"fin":63.2},"qfreesep":{"hit":95.9,"hitsd":1.2,"fin":88.4},"real14":{"hit":93.3,"hitsd":3.5,"fin":82.6},"real24":{"hit":95.8,"hitsd":1.5,"fin":86.5}}};
+  var METHODS = ['sgd', 'wanchor', 'oanchor', 'replay', 'togd', 'togdr'];
+  var ARCHS = ['qs3', 'qs3sep', 'qfree', 'qfreesep', 'real14', 'real24'];
+  var ARCH_COLOR = { qs3: '#fb7185', qs3sep: '#fdba74', qfree: '#fde047', qfreesep: '#5ee6c8', real14: '#93c5fd', real24: '#c4b5fd' };
+  var curArch = 'qs3', mode = 'manual';
+
+  // ---------- knob scales (index sliders → values from the sweep grids) ----------
+  var SCALES = {
+    lambda: [0, 0.01, 0.02, 0.03, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16],
+    mu: [0, 0.001, 0.002, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.03, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3],
+    rho: [0, 0.05, 0.1, 0.15, 0.25, 0.35, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 16],
+    refresh: [5, 10, 25, 50, 100, 1000]
+  };
+  function getRef(m) { var h = REF.headline[m]; return h[h.length - 1]; }
+
+  var META = {
+    sgd: { name: 'Vanilla SGD', color: '#f87171', dash: [], rule: 'θ ← exp_θ(−η ∇L_B)', tag: 'BASELINE',
+      note: 'No protection. Task A falls through the majority line and ends worse than predicting "outside" everywhere.' },
+    wanchor: { name: 'Weight anchor', color: '#fbbf24', dash: [], rule: '+ λ·[d_S³(q,q*)² + ‖A−A*‖² + ‖b−b*‖²]', knob: 'lambda', tag: 'PARAMETER SPACE',
+      note: 'Holds Task A by holding the weights still, so the two tasks trade off directly: no λ gives both. λ = 0.05 → 73 / 96, λ = 2 → 92 / 67.' },
+    oanchor: { name: 'Output anchor', color: '#60a5fa', dash: [], rule: '+ μ·mean (z_A(x_m) − z_A*(x_m))²', knob: 'mu', tag: 'FUNCTION SPACE',
+      note: 'Pins Task A’s logits on the 100 stored inputs. The weights still move but the function doesn’t. Task B starts slower: 84% at step 50.' },
+    replay: { name: 'Replay', color: '#c084fc', dash: [], rule: '+ ρ·BCE_A on stored (x_m, y_m)', knob: 'rho', tag: 'REHEARSAL',
+      note: 'Keeps training Task A on the 100 stored labelled points alongside Task B. The standard strong baseline, and the one to beat.' },
+    togd: { name: 'Tangent OGD · static', color: '#34d399', dash: [6, 4], rule: 'g ← g − Σ⟨g,u_k⟩u_k,  u = top-K ∇θ z_A at θ*', knob: 'K', tag: 'FROZEN BASIS',
+      note: 'Projects Task B’s gradient off Task A’s top-K output gradients, frozen at the checkpoint. Strong early, then drifts to about 60% for every K: the gradients it protects stop being the right ones.' },
+    togdr: { name: 'Tangent OGD · refreshed', color: '#34d399', dash: [], rule: 'same projection, basis recomputed at current θ', knob: 'refresh', tag: 'RE-LINEARISED',
+      note: 'Same projection, rebuilt every N steps on the same 100 inputs. Matches replay, at about 25–45× the compute per step. Refreshing every 50 steps drops it to 84%.' }
+  };
+
+  // ---------- DOM helpers ----------
+  function $(id) { return document.getElementById(id); }
+  function el(tag, attrs, html) { var e = document.createElement(tag); for (var k in (attrs || {})) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+  function fmt(x, d) { return (x == null || isNaN(x)) ? '—' : x.toFixed(d == null ? 1 : d); }
+
+  // scoreboard
+  (function () {
+    var sb = $('scoreboard');
+    METHODS.slice().sort(function (a, b) { return getRef(b)[1] - getRef(a)[1]; }).forEach(function (m) {
+      var r = getRef(m);
+      sb.appendChild(el('div', { class: 'score', style: 'border-top:2px solid ' + META[m].color },
+        '<div class="n" style="color:' + META[m].color + '">' + fmt(r[1]) + '%</div><div class="l">' + META[m].name + '</div>' +
+        '<div class="s">±' + fmt(r[2]) + ' · B ' + fmt(r[5]) + '%</div>'));
+    });
+  })();
+  $('floor-txt').textContent = QCL.MAJORITY_FLOOR.toFixed(1) + '%';
+  Array.prototype.forEach.call(document.querySelectorAll('.floor-val'), function (e) { e.textContent = QCL.MAJORITY_FLOOR.toFixed(1) + '%'; });
+  (function () {
+    var m = REF.memory, get = function (k, M) { var r = m[k].filter(function (x) { return x[0] === M; })[0]; return r ? r[1].toFixed(1) : '—'; };
+    $('mem-finding').innerHTML = 'With only 10 stored points, the output anchor keeps <span class="num">' + get('oanchor', 10) + '%</span> and replay <span class="num">' + get('replay', 10) +
+      '%</span>, because a stored logit carries more than a 0/1 label. At 25 points: <span class="num">' + get('oanchor', 25) + '</span> vs <span class="num">' + get('replay', 25) +
+      '</span>. Static OGD stays near <span class="num">' + get('togd', 10) + '–' + get('togd', 100) + '%</span> at every memory size.';
+  })();
+
+  // ---------- architecture study panel ----------
+  function heat(v) { var t = Math.max(0, Math.min(1, (v - 60) / 37)); return 'hsl(' + Math.round(t * 165) + ',55%,' + Math.round(22 + t * 6) + '%)'; }
+  function ci(p) { return (p.d >= 0 ? '+' : '−') + Math.abs(p.d).toFixed(1) + ' [' + p.ci[0].toFixed(1) + ', ' + p.ci[1].toFixed(1) + ']'; }
+  function pair(a, b) { return STUDY.confirm.pairs.filter(function (p) { return p.a === a && p.b === b; })[0]; }
+  (function () {
+    var C = STUDY.confirm, mx = $('matrix'), I = QCL.ARCH_INFO;
+    function cell(an, extra) { var v = C[an].hit; return '<div class="cell" style="background:' + heat(v[0]) + '"><div class="v">' + v[0].toFixed(1) + '</div><div class="s">±' + v[1].toFixed(1) + (extra || '') + '</div></div>'; }
+    mx.innerHTML = '<div></div><div class="hd">S³ · unit q</div><div class="hd">free · w ∈ ℝ⁴</div>' +
+      '<div class="rh">shared output<br>(A = i, B = j)</div>' + cell('qs3', ' · ' + I.qs3.P + ' p') + cell('qfree', ' · ' + I.qfree.P + ' p') +
+      '<div class="rh">split outputs<br>(one per task)</div>' + cell('qs3sep', ' · ' + I.qs3sep.P + ' p') + cell('qfreesep', ' · ' + I.qfreesep.P + ' p') +
+      '<div class="rh">real tanh MLP</div>' + cell('real14', ' · 14 wide · ' + I.real14.P + ' p') + cell('real24', ' · 24 wide · ' + I.real24.P + ' p');
+    var lines = [['split heads, on S³', 'qs3sep', 'qs3'], ['split heads, free', 'qfreesep', 'qfree'], ['drop S³, split heads', 'qfreesep', 'qs3sep'],
+                 ['drop S³, shared head', 'qfree', 'qs3'], ['free split vs real 14', 'qfreesep', 'real14'], ['free split vs real 24', 'qfreesep', 'real24']];
+    $('effects').innerHTML = lines.map(function (l) { var p = pair(l[1], l[2]); return '<div>' + l[0] + ': <b>' + ci(p) + '</b></div>'; }).join('');
+    $('verdict').innerHTML =
+      '<li><b>The shared output quaternion is the main cause.</b> Giving each task its own output quaternion recovers <b>' + ci(pair('qs3sep', 'qs3')) + '</b> points on S³ and <b>' + ci(pair('qfreesep', 'qfree')) + '</b> with free weights. Separate heads are known to forget far less (van de Ven et al., 2022); the i and j parts of one output quaternion act as a single shared head.</li>' +
+      '<li><b>The S³ cost is a step-size effect, not the sphere.</b> With split heads, S³ weights trail free ones by <b>' + ci(pair('qfreesep', 'qs3sep')) + '</b>. Writing w = A·q shrinks every direction step by A². Same checkpoint, same batches: dropping the unit-norm constraint changes nothing (+0.0 [0.0, 0.1]); dividing the q step by A² recovers <b>+9.4 [6.0, 13.0]</b>. It survives Adam (+9.4 to +10.6, paired). This is the length–direction split of weight normalization, so the mechanism is known; the forgetting cost is what\u2019s measured here. With a shared head the S³ effect wasn\u2019t stable (+12 on seeds 1–12, ' + ci(pair('qfree', 'qs3')) + ' on the fresh 24).</li>' +
+      '<li><b>No quaternion advantage.</b> With both fixes, the ' + I.qfreesep.P + '-parameter quaternion network matches the ' + I.real14.P + '- and ' + I.real24.P + '-parameter real MLPs (' + ci(pair('qfreesep', 'real14')) + '). An apparent +2.6-point edge on seeds 1–12 did not replicate.</li>' +
+      '<li><b>Task A is misread, not erased.</b> After Task B, a linear probe on the last hidden layer still reads Task A at 98.7–99.4% on every network (24 fresh seeds). Refitting only Task A\u2019s linear readout on the 100 stored points recovers 90–96%. This matches probing studies of continual learning (Davari et al., CVPR 2022).</li>' +
+      '<li><b>Good methods erase the differences.</b> With replay or refreshed OGD, every network keeps 95–97% of Task A (table below); output anchoring does on five of six. Static OGD fails only on the shared-output networks.</li>';
+    var rows = '<tr><th style="text-align:left">Method</th>' + ARCHS.map(function (an) { return '<th>' + I[an].short + '<br><span style="color:#5b6675;font-weight:400">' + I[an].P + ' p</span></th>'; }).join('') + '</tr>';
+    METHODS.forEach(function (m) {
+      rows += '<tr><td style="color:' + META[m].color + '">' + META[m].name + '</td>' + ARCHS.map(function (an) {
+        var t = STUDY.archs[an].m[m];
+        return '<td class="hv" style="background:' + heat(t.test.A) + '">' + t.test.A.toFixed(1) + ' <span style="opacity:.7;font-size:10px">±' + t.test.Asd.toFixed(1) + '</span><span class="bsub">B ' + t.test.B.toFixed(1) + (t.tuneOK ? '' : ' *') + '</span></td>';
+      }).join('') + '</tr>';
+    });
+    $('arch-table').innerHTML = rows;
+    $('arch-list').textContent = ARCHS.map(function (an) { return I[an].name + ' (' + I[an].P + ' params: ' + I[an].desc + ')'; }).join('; ');
+    var lg = $('arch-legend');
+    ARCHS.forEach(function (an) { lg.appendChild(el('span', null, '<i style="border-color:' + ARCH_COLOR[an] + '"></i>' + I[an].short + ' · lr ' + STUDY.archs[an].m.sgd.lr)); });
+  })();
+  function drawArchChart() {
+    var cv = $('arch-chart'); if (!cv) return;
+    var S = setupCanvas(cv), ctx = S.ctx, w = S.w, h = S.h, padL = 34, padR = 8, padT = 8, padB = 20, y0 = 40, y1 = 100;
+    var X = function (s) { return padL + (w - padL - padR) * s / 1000; }, Y = function (v) { return padT + (h - padT - padB) * (1 - (v - y0) / (y1 - y0)); };
+    ctx.clearRect(0, 0, w, h); ctx.font = '10px Space Mono, monospace'; ctx.lineWidth = 1;
+    for (var v = y0; v <= y1; v += 10) { ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.beginPath(); ctx.moveTo(padL, Y(v)); ctx.lineTo(w - padR, Y(v)); ctx.stroke(); ctx.fillStyle = '#5b6675'; ctx.fillText(v + '', 4, Y(v) + 3); }
+    for (var s = 0; s <= 1000; s += 250) { ctx.fillStyle = '#5b6675'; ctx.fillText(s + '', Math.min(X(s) - 6, w - 30), h - 5); }
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(234,179,8,.7)'; ctx.beginPath(); ctx.moveTo(padL, Y(QCL.MAJORITY_FLOOR)); ctx.lineTo(w - padR, Y(QCL.MAJORITY_FLOOR)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(234,179,8,.9)'; ctx.fillText('majority ' + QCL.MAJORITY_FLOOR.toFixed(1), w - padR - 92, Y(QCL.MAJORITY_FLOOR) - 4);
+    ARCHS.forEach(function (an) {
+      var c = STUDY.archs[an].m.sgd.curve; ctx.strokeStyle = ARCH_COLOR[an]; ctx.lineWidth = an === curArch ? 2.8 : 1.6;
+      ctx.beginPath(); c.forEach(function (r, i) { var px = X(r[0]), py = Y(Math.max(y0, r[1])); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }); ctx.stroke();
+    });
+  }
+
+  // ---------- knobs ----------
+  var cfg = Object.assign({}, QCL.DEFAULTS, { evalEvery: 25 });
+  function idxOf(arr, v) { var best = 0; for (var i = 0; i < arr.length; i++) if (Math.abs(arr[i] - v) < Math.abs(arr[best] - v)) best = i; return best; }
+  var knobDefs = {
+    lambda: { get: function (i) { return SCALES.lambda[i]; }, show: function (v) { return v; } },
+    mu: { get: function (i) { return SCALES.mu[i]; }, show: function (v) { return v; } },
+    rho: { get: function (i) { return SCALES.rho[i]; }, show: function (v) { return v; } },
+    K: { get: function (i) { return +i; }, show: function (v) { return v; } },
+    refresh: { get: function (i) { return SCALES.refresh[i]; }, show: function (v) { return v >= 1000 ? 'never' : v + ' steps'; } },
+    lr: { get: function (i) { return +i; }, show: function (v) { return (+v).toFixed(3); } }
+  };
+  Object.keys(knobDefs).forEach(function (k) {
+    var input = $('k-' + k), d = knobDefs[k];
+    input.value = SCALES[k] ? idxOf(SCALES[k], cfg[k]) : cfg[k];
+    var sync = function () {
+      var v = d.get(input.value); cfg[k] = v; $('v-' + k).textContent = d.show(v);
+      if (run && mode === 'manual') {
+        run.cfg[k] = v;   // setup() copies cfg, so push live changes into the running config
+        if (k === 'K') run.ctx.basis = QCL.buildOGDBasis(run.ckpt.th, run.ctx.mem, cfg.K, run.ar).basis;
+      }
+      renderRefLines(); drawChart();
+    };
+    input.addEventListener('input', sync); sync();
+  });
+  function isDefault(m) {
+    var k = META[m].knob; if (cfg.lr !== QCL.DEFAULTS.lr) return false; if (!k) return true;
+    return cfg[k] === QCL.DEFAULTS[k] && (m !== 'togdr' || cfg.K === QCL.DEFAULTS.K);
+  }
+  var KNOB_SYM = { lambda: 'λ', mu: 'μ', rho: 'ρ', K: 'K', refresh: 'every' };
+  function tunedPer(an) { var P = {}; METHODS.forEach(function (m) { var t = STUDY.archs[an].m[m]; P[m] = Object.assign({ lr: t.lr }, t.kv); }); return P; }
+  function effCfg() {
+    var c = Object.assign({}, cfg, { arch: curArch });
+    if (mode === 'tuned') c.per = tunedPer(curArch); else delete c.per;
+    return c;
+  }
+  function settingTxt(m, c) {
+    var p = (c.per && c.per[m]) || null, src = p || c, out = 'lr ' + (p ? p.lr : c.lr);
+    var k = META[m].knob;
+    if (m === 'togdr') out += ' · K ' + (src.K || c.K) + ' · every ' + ((src.refresh || c.refresh) >= 1000 ? '∞' : (src.refresh || c.refresh));
+    else if (k) out += ' · ' + KNOB_SYM[k] + ' ' + (src[k] != null ? src[k] : c[k]);
+    return out;
+  }
+  // Reference for the current (network, settings): 16-seed S³ defaults, or the 12-seed study.
+  function refFor(m) {
+    if (mode === 'tuned') { var t = STUDY.archs[curArch].m[m]; return { A: t.all.A, sd: t.all.Asd, min: t.all.Amin, B: t.all.B, label: '12-seed study reference (tuned) at step 1000',
+      curve: t.curve.map(function (r) { return [r[0], r[1], r[2]]; }) }; }
+    if (curArch === 'qs3' && isDefault(m)) { var r = getRef(m); return { A: r[1], sd: r[2], min: r[3], B: r[5], label: '16-seed reference at step 1000',
+      curve: REF.headline[m].map(function (x) { return [x[0], x[1], x[5]]; }) }; }
+    return null;
+  }
+
+  // ---------- cards ----------
+  var fieldCtx = {};
+  METHODS.forEach(function (m) {
+    var M = META[m], c = el('div', { class: 'panel card', style: '--mc:' + M.color });
+    c.innerHTML =
+      '<div class="card-head"><div><span class="card-title">' + M.name + '</span><span class="rule">' + M.rule + '</span><span class="tuned-tag" id="set-' + m + '"></span></div>' +
+      '<span class="tag" style="color:' + M.color + ';border-color:' + M.color + '66">' + M.tag + '</span></div>' +
+      '<div class="fields"><div class="field"><span class="cap">Task A · circle (i)</span><canvas width="40" height="40" id="f-' + m + '-A"></canvas></div>' +
+      '<div class="field"><span class="cap">Task B · diagonal (j)</span><canvas width="40" height="40" id="f-' + m + '-B"></canvas></div></div>' +
+      '<div class="readout"><div><span>Task A</span><b id="ra-' + m + '">—</b></div><div><span>Task B</span><b id="rb-' + m + '">—</b></div></div>' +
+      '<div class="note"><span class="note-ctx" id="nc-' + m + '" style="color:#5b6675"></span>' + M.note + '</div>' +
+      '<div class="refline" id="ref-' + m + '"></div>';
+    $('cards').appendChild(c);
+    fieldCtx[m] = { A: $('f-' + m + '-A').getContext('2d'), B: $('f-' + m + '-B').getContext('2d') };
+  });
+  function renderRefLines() {
+    var c = effCfg();
+    METHODS.forEach(function (m) {
+      var line = $('ref-' + m); if (!line) return;
+      $('set-' + m).textContent = (mode === 'tuned' ? 'tuned · ' : '') + settingTxt(m, c);
+      $('nc-' + m).textContent = (curArch !== 'qs3' || mode === 'tuned') ? 'On the S³ network with shared defaults: ' : '';
+      var r = refFor(m);
+      if (r) line.innerHTML = r.label + ': A <b>' + fmt(r.A) + ' ± ' + fmt(r.sd) + '</b> (min ' + fmt(r.min, 0) + ') · B <b>' + fmt(r.B) + '</b>';
+      else line.innerHTML = curArch === 'qs3' ? 'Settings changed from default: use the benchmark to measure them.' : 'No stored reference for shared defaults on this network: use the benchmark, or switch to tuned settings.';
+    });
+  }
+  renderRefLines();
+
+  // ---------- decision fields (40×40, evaluated cell centres) ----------
+  var FIELD_N = 40;
+  function fieldArch() { return run ? run.ar : QCL.arch(curArch); }
+  function drawField(ctx, th, head) {
+    var img = ctx.createImageData(FIELD_N, FIELD_N), d = img.data;
+    for (var gy = 0; gy < FIELD_N; gy++) for (var gx = 0; gx < FIELD_N; gx++) {
+      var x1 = (gx + 0.5) / FIELD_N * 2 - 1, x2 = 1 - (gy + 0.5) / FIELD_N * 2;
+      var fw = fieldArch().forward(th, x1, x2), p = QCL.sigmoid(head === 'A' ? fw.zA : fw.zB);
+      var truth = head === 'A' ? QCL.labelA(x1, x2) : QCL.labelB(x1, x2);
+      var wrong = (p >= 0.5 ? 1 : 0) !== truth, o = 4 * (gy * FIELD_N + gx);
+      if (head === 'A') { d[o] = 12 + p * 82; d[o + 1] = 20 + p * 210; d[o + 2] = 30 + p * 170; }
+      else { d[o] = 18 + p * 214; d[o + 1] = 18 + p * 76; d[o + 2] = 30 + p * 200; }
+      if (wrong) { d[o] = Math.min(255, d[o] * 0.55 + 120); d[o + 1] *= 0.45; d[o + 2] *= 0.45; }
+      d[o + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  function drawFields() { if (!run) return; METHODS.forEach(function (m) { var th = run.models[m]; drawField(fieldCtx[m].A, th, 'A'); drawField(fieldCtx[m].B, th, 'B'); }); }
+  function drawTruthOverlay() {
+    // Ground-truth outlines drawn in CSS-pixel space on top of each field canvas
+    METHODS.forEach(function (m) {
+      ['A', 'B'].forEach(function (h) {
+        var cv = $('f-' + m + '-' + h), wrap = cv.parentNode;
+        if (wrap.querySelector('svg')) return;
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '-1 -1 2 2'); svg.setAttribute('preserveAspectRatio', 'none');
+        svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
+        svg.innerHTML = h === 'A' ? '<circle cx="0" cy="0" r="' + Math.sqrt(0.45) + '" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="0.018"/>'
+                                  : '<line x1="-1" y1="1" x2="1" y2="-1" stroke="rgba(255,255,255,.85)" stroke-width="0.018" stroke-dasharray="0.06 0.05"/>';
+        var holder = el('div', { style: 'position:relative' }); wrap.replaceChild(holder, cv); holder.appendChild(cv); holder.appendChild(svg);
+      });
+    });
+  }
+  drawTruthOverlay();
+  METHODS.forEach(function (m) { ['A', 'B'].forEach(function (h) { var c = fieldCtx[m][h]; c.fillStyle = '#05080d'; c.fillRect(0, 0, FIELD_N, FIELD_N); }); });
+
+  // ---------- line chart ----------
+  var chartKey = 'A';
+  function setupCanvas(cv) {
+    var r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.max(10, Math.round(r.width * dpr)); cv.height = Math.max(10, Math.round(r.height * dpr));
+    var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx: ctx, w: r.width, h: r.height };
+  }
+  function drawChart() {
+    if (!$('chart')) return;
+    var S = setupCanvas($('chart')), ctx = S.ctx, w = S.w, h = S.h, padL = 34, padR = 8, padT = 8, padB = 20;
+    var y0 = chartKey === 'A' ? 40 : 30, y1 = 100;
+    var X = function (s) { return padL + (w - padL - padR) * s / 1000; }, Y = function (v) { return padT + (h - padT - padB) * (1 - (v - y0) / (y1 - y0)); };
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = '10px Space Mono, monospace'; ctx.fillStyle = '#5b6675'; ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+    for (var v = y0; v <= y1; v += 10) { ctx.beginPath(); ctx.moveTo(padL, Y(v)); ctx.lineTo(w - padR, Y(v)); ctx.stroke(); ctx.fillText(v + '', 4, Y(v) + 3); }
+    for (var s = 0; s <= 1000; s += 250) ctx.fillText(s + '', Math.min(X(s) - 6, w - 30), h - 5);
+    if (chartKey === 'A') {
+      ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(234,179,8,.8)'; ctx.beginPath(); ctx.moveTo(padL, Y(QCL.MAJORITY_FLOOR)); ctx.lineTo(w - padR, Y(QCL.MAJORITY_FLOOR)); ctx.stroke();
+      ctx.setLineDash([2, 4]); ctx.strokeStyle = 'rgba(156,163,175,.7)'; ctx.beginPath(); ctx.moveTo(padL, Y(50)); ctx.lineTo(w - padR, Y(50)); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle = 'rgba(234,179,8,.9)'; ctx.fillText('majority ' + QCL.MAJORITY_FLOOR.toFixed(1), w - padR - 92, Y(QCL.MAJORITY_FLOOR) - 4);
+      ctx.fillStyle = 'rgba(156,163,175,.9)'; ctx.fillText('half-plane 50', w - padR - 86, Y(50) - 4);
+    }
+    // faint reference means for the current network/settings, when stored
+    METHODS.forEach(function (m) {
+      var R = refFor(m); if (!R) return;
+      var H = R.curve, col = chartKey === 'A' ? 1 : 2;
+      ctx.strokeStyle = META[m].color; ctx.globalAlpha = 0.18; ctx.lineWidth = 4; ctx.setLineDash([]);
+      ctx.beginPath(); H.forEach(function (r, i) { var px = X(r[0]), py = Y(r[col]); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+    if (run) METHODS.forEach(function (m) {
+      ctx.strokeStyle = META[m].color; ctx.lineWidth = 1.8; ctx.setLineDash(META[m].dash);
+      ctx.beginPath(); run.history.forEach(function (r, i) { var v = r[m][chartKey === 'A' ? 0 : 1], px = X(r.step), py = Y(Math.max(y0, v)); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+  }
+  (function () {
+    var lg = $('legend');
+    METHODS.forEach(function (m) { lg.appendChild(el('span', null, '<i style="border-color:' + META[m].color + ';' + (META[m].dash.length ? 'border-top-style:dashed' : '') + '"></i>' + META[m].name)); });
+    lg.appendChild(el('span', null, '<i style="border-color:rgba(255,255,255,.3);border-top-width:4px;opacity:.6"></i>wide faint = stored reference mean'));
+    $('chart-toggle').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return; chartKey = b.dataset.k;
+      Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle('on', x === b); }); drawChart();
+    });
+  })();
+
+  // ---------- S³ viewer ----------
+  var three = null, vizModel = 'oanchor';
+  (function () {
+    var sel = $('viz-model');
+    METHODS.forEach(function (m) { var o = el('option', { value: m }, META[m].name); if (m === vizModel) o.selected = true; sel.appendChild(o); });
+    sel.addEventListener('change', function () { vizModel = sel.value; $('viz-swatch').style.borderColor = META[vizModel].color; updateThree(); });
+    if (typeof THREE === 'undefined') { $('three').innerHTML = '<div class="mono" style="padding:16px;color:#8b97a6;font-size:11px">3D view unavailable (three.js did not load).</div>'; return; }
+    var box = $('three'), scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, box.clientWidth / box.clientHeight, 0.1, 50);
+    cam.position.set(0.6, 0.5, 2.7);
+    var rend = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    rend.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); rend.setSize(box.clientWidth, box.clientHeight); box.appendChild(rend.domElement);
+    var ctr = THREE.OrbitControls ? new THREE.OrbitControls(cam, rend.domElement) : null;
+    if (ctr) { ctr.enableDamping = true; ctr.autoRotate = true; ctr.autoRotateSpeed = 0.5; }
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: 0x5ee6c8, wireframe: true, transparent: true, opacity: 0.05 })));
+    [[1, 0, 0, 0x6b7280], [0, 1, 0, 0x6b7280], [0, 0, 1, 0x6b7280]].forEach(function (a) {
+      var g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-a[0], -a[1], -a[2]), new THREE.Vector3(a[0], a[1], a[2])]);
+      scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: a[3], transparent: true, opacity: 0.25 })));
+    });
+    var N = 64;
+    function pts(color, size) { var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3)); var p = new THREE.Points(g, new THREE.PointsMaterial({ color: color, size: size, transparent: true, opacity: 0.95 })); scene.add(p); return p; }
+    var ck = pts(0x6b7280, 0.05), cur = pts(0x60a5fa, 0.075);
+    var lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3));
+    var lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.45 })); scene.add(lines);
+    ck.visible = cur.visible = lines.visible = false;
+    var msg = el('div', { class: 'msg' }); msg.style.display = 'none'; box.appendChild(msg);
+    three = { scene: scene, cam: cam, rend: rend, ctr: ctr, ck: ck, cur: cur, lines: lines, box: box, msg: msg };
+    (function loop() { requestAnimationFrame(loop); if (ctr) ctr.update(); rend.render(scene, cam); })();
+    window.addEventListener('resize', function () { cam.aspect = box.clientWidth / box.clientHeight; cam.updateProjectionMatrix(); rend.setSize(box.clientWidth, box.clientHeight); });
+  })();
+  // Stereographic projection of a (normalised) quaternion, canonicalised to q_r ≥ 0 since q ≡ −q
+  function stereo(th, o) {
+    var n = Math.sqrt(th[o] * th[o] + th[o + 1] * th[o + 1] + th[o + 2] * th[o + 2] + th[o + 3] * th[o + 3]) || 1;
+    var r = th[o] / n, s = r >= 0 ? 1 : -1, d = 1 + s * r;
+    return [s * th[o + 1] / n / d, s * th[o + 2] / n / d, s * th[o + 3] / n / d];
+  }
+  function relDrift(th, ref) { var a = 0, b = 0; for (var i = 0; i < th.length; i++) { a += (th[i] - ref[i]) * (th[i] - ref[i]); b += ref[i] * ref[i]; } return Math.sqrt(a / b); }
+  function updateVizNote() {
+    var ar = fieldArch();
+    $('viz-note').innerHTML = !ar.quatBlocks.length ? 'real-valued network: no quaternion weights' : ar.unit ? 'P = (q<sub>i</sub>, q<sub>j</sub>, q<sub>k</sub>)/(1+q<sub>r</sub>), q<sub>r</sub> ≥ 0' : 'free weights: direction w/‖w‖ projected the same way';
+  }
+  function updateThree() {
+    var dr = $('drift'); dr.innerHTML = ''; updateVizNote();
+    if (run) {
+      dr.appendChild(el('span', { style: 'grid-column:1/-1;color:#5b6675' }, 'relative drift ‖θ − θ*‖ / ‖θ*‖'));
+      METHODS.forEach(function (m) { dr.appendChild(el('span', null, '<span style="color:' + META[m].color + '">■</span> ' + META[m].name.replace('Tangent OGD · ', 'OGD ') + ' <b>' + relDrift(run.models[m], run.ckpt.th).toFixed(3) + '</b>')); });
+    }
+    if (!three) return;
+    var ar = fieldArch(), QOFF = ar.quatBlocks;
+    if (!QOFF.length) { three.ck.visible = three.cur.visible = three.lines.visible = false; three.msg.style.display = 'flex'; three.msg.textContent = 'This network has real-valued weights, so there is nothing to place on S³. Drift is shown below.'; return; }
+    three.msg.style.display = 'none';
+    if (!run) return;
+    var th = run.models[vizModel], ref = run.ckpt.th, pc = three.ck.geometry.attributes.position, pq = three.cur.geometry.attributes.position, pl = three.lines.geometry.attributes.position;
+    QOFF.forEach(function (o, i) { var a = stereo(ref, o), b = stereo(th, o); pc.setXYZ(i, a[0], a[1], a[2]); pq.setXYZ(i, b[0], b[1], b[2]); pl.setXYZ(2 * i, a[0], a[1], a[2]); pl.setXYZ(2 * i + 1, b[0], b[1], b[2]); });
+    three.ck.geometry.setDrawRange(0, QOFF.length); three.cur.geometry.setDrawRange(0, QOFF.length); three.lines.geometry.setDrawRange(0, 2 * QOFF.length);
+    pc.needsUpdate = pq.needsUpdate = pl.needsUpdate = true;
+    var col = new THREE.Color(META[vizModel].color); three.cur.material.color = col; three.lines.material.color = col;
+    three.ck.visible = three.cur.visible = three.lines.visible = true;
+  }
+
+  // ---------- live run ----------
+  var run = null, trainer = null, phase = 'READY', paused = false;
+  function setPhase(p, color) { phase = p; $('phase').textContent = p; $('phase').style.color = color || '#fff'; }
+  function updateReadouts() {
+    if (!run || !run.history.length) return;
+    var last = run.history[run.history.length - 1];
+    METHODS.forEach(function (m) { $('ra-' + m).textContent = fmt(last[m][0]) + '%'; $('rb-' + m).textContent = fmt(last[m][1]) + '%'; });
+    $('step').textContent = run.step;
+  }
+  $('btn-a').addEventListener('click', function () {
+    var seed = Math.max(1, parseInt($('seed').value, 10) || 1); cfg.seed = seed;
+    trainer = QCL.makeTrainer(QCL.makeRng(seed * 7919 + 1), QCL.arch(curArch));
+    $('btn-a').disabled = true; $('seed').disabled = true; $('arch').disabled = true; $('mode').disabled = true; setPhase('TRAINING TASK A', '#5ee6c8');
+    (function tick() {
+      var t0 = performance.now();
+      while (!trainer.done && performance.now() - t0 < 30) trainer.step(5);
+      $('ckpt-info').innerHTML = 'Task A attempt <b>' + trainer.attempts + '</b> · step <b>' + trainer.s + '</b> · grid accuracy <b>' + fmt(trainer.acc) + '%</b>';
+      drawField(fieldCtx.sgd.A, trainer.th, 'A');
+      if (!trainer.done) return requestAnimationFrame(tick);
+      var ck = trainer.result();
+      run = QCL.setup(effCfg(), ck); QCL.record(run);
+      setPhase('CHECKPOINT READY', '#34d399');
+      $('ckpt-info').innerHTML = 'Checkpoint <b>' + fmt(ck.acc) + '%</b> on attempt ' + ck.attempts + ' · OGD Jacobian rank <b>' + run.ctx.ogd.rank + '</b>, top-' + (run.cfg.per ? run.cfg.per.togd.K : cfg.K) + ' energy <b>' + (100 * run.ctx.ogd.energy).toFixed(1) + '%</b>';
+      $('btn-b').disabled = false; updateReadouts(); drawFields(); drawChart(); updateThree();
+    })();
+  });
+  $('btn-b').addEventListener('click', function () {
+    $('btn-b').disabled = true; $('btn-pause').disabled = false; paused = false; setPhase('RUNNING TASK B', '#c084fc');
+    var lastDraw = 0;
+    (function tick() {
+      if (paused) return;
+      var t0 = performance.now(), before = run.history.length;
+      while (run.step < run.cfg.steps && performance.now() - t0 < 24) QCL.advance(run, 1);
+      if (run.history.length !== before || run.step >= run.cfg.steps) {
+        updateReadouts(); drawChart();
+        if (performance.now() - lastDraw > 250 || run.step >= run.cfg.steps) { drawFields(); updateThree(); lastDraw = performance.now(); }
+      } else $('step').textContent = run.step;
+      if (run.step >= run.cfg.steps) { setPhase('RUN COMPLETE', '#34d399'); $('btn-pause').disabled = true; return; }
+      requestAnimationFrame(tick);
+    })();
+  });
+  $('btn-pause').addEventListener('click', function () {
+    if (!paused) { paused = true; this.textContent = 'Resume'; setPhase('PAUSED', '#fbbf24'); }
+    else { this.textContent = 'Pause'; $('btn-b').disabled = false; $('btn-b').click(); }
+  });
+  $('btn-reset').addEventListener('click', function () { location.reload(); });
+  window.addEventListener('resize', function () { drawChart(); drawPareto(); });
+
+  // ---------- benchmark (workers) ----------
+  var workers = [], bench = null;
+  function workerSource() {
+    return document.getElementById('qcl-engine').textContent + '\n' +
+      'self.onmessage = function (e) { var c = e.data.cfg, run = QCL.setup(c); QCL.record(run);' +
+      ' self.postMessage({ type: "ckpt", seed: c.seed, acc: run.ckpt.acc });' +
+      ' while (!QCL.advance(run, 50)) self.postMessage({ type: "progress", seed: c.seed, step: run.step });' +
+      ' self.postMessage({ type: "done", seed: c.seed, ckpt: run.ckpt.acc, attempts: run.ckpt.attempts, history: run.history }); };';
+  }
+  $('btn-bench').addEventListener('click', function () {
+    var n = parseInt($('bench-n').value, 10), conc = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1, n));
+    var url = URL.createObjectURL(new Blob([workerSource()], { type: 'text/javascript' }));
+    var ec = effCfg(), bcfg = { arch: ec.arch, lr: ec.lr, lambda: ec.lambda, mu: ec.mu, rho: ec.rho, K: ec.K, refresh: ec.refresh, evalEvery: 50 };
+    if (ec.per) bcfg.per = ec.per;
+    bench = { n: n, next: 1, done: [], progress: {}, cfg: bcfg, arch: curArch, mode: mode, t0: performance.now() };
+    benchResult = null; drawPareto();
+    $('btn-bench').disabled = true; $('btn-bench-stop').disabled = false; $('bench-n').disabled = true; $('arch').disabled = true; $('mode').disabled = true;
+    workers = [];
+    function launch(w) {
+      if (bench.next > n) return;
+      var s = bench.next++; bench.progress[s] = 0;
+      w.postMessage({ cfg: Object.assign({ seed: s }, bcfg) });
+    }
+    for (var i = 0; i < conc; i++) {
+      var w = new Worker(url); workers.push(w);
+      w.onmessage = (function (w) {
+        return function (e) {
+          var d = e.data; if (!bench) return;
+          if (d.type === 'progress') bench.progress[d.seed] = d.step;
+          if (d.type === 'done') { delete bench.progress[d.seed]; bench.done.push(d); renderBench(); launch(w); }
+          var partial = 0; for (var k in bench.progress) partial += bench.progress[k] / 1000;
+          var frac = (bench.done.length + partial) / n, el = (performance.now() - bench.t0) / 1000;
+          $('bench-bar').style.width = (100 * frac) + '%';
+          $('bench-status').textContent = bench.done.length + ' / ' + n + ' seeds done · ' + el.toFixed(0) + ' s elapsed' + (frac > 0.05 && frac < 1 ? ' · ~' + Math.round(el / frac - el) + ' s left' : '') + ' · ' + conc + ' worker' + (conc > 1 ? 's' : '');
+          if (bench.done.length === n) finishBench();
+        };
+      })(w);
+      launch(w);
+    }
+    $('bench-status').textContent = 'Starting ' + conc + ' worker' + (conc > 1 ? 's' : '') + '…';
+  });
+  function finishBench() {
+    workers.forEach(function (w) { w.terminate(); }); workers = []; $('btn-bench').disabled = false; $('btn-bench-stop').disabled = true; $('bench-n').disabled = false;
+    if (!run && !trainer) { $('arch').disabled = false; $('mode').disabled = false; }
+  }
+  $('btn-bench-stop').addEventListener('click', function () { finishBench(); if (bench) $('bench-status').textContent += ' · stopped'; });
+
+  function stats(a) { var m = a.reduce(function (p, c) { return p + c; }, 0) / a.length, v = a.reduce(function (p, c) { return p + (c - m) * (c - m); }, 0) / a.length; return { m: m, sd: Math.sqrt(v), min: Math.min.apply(null, a) }; }
+  var benchResult = null;
+  function renderBench() {
+    var D = bench.done; if (!D.length) return;
+    var knobTxt = {}; METHODS.forEach(function (m) { knobTxt[m] = settingTxt(m, bench.cfg); });
+    var at = function (step) { return function (d) { return d.history.filter(function (r) { return r.step === step; })[0]; }; };
+    var rows = '<tr><th>Method</th><th>Settings</th><th>A @50</th><th>A @300</th><th>A @1000</th><th>min</th><th>B @1000</th></tr>';
+    benchResult = {};
+    METHODS.forEach(function (m) {
+      var a50 = stats(D.map(at(50)).map(function (r) { return r[m][0]; })), a300 = stats(D.map(at(300)).map(function (r) { return r[m][0]; }));
+      var a1k = stats(D.map(at(1000)).map(function (r) { return r[m][0]; })), b1k = stats(D.map(at(1000)).map(function (r) { return r[m][1]; }));
+      benchResult[m] = { A: a1k, B: b1k };
+      rows += '<tr><td style="color:' + META[m].color + '">' + META[m].name + '</td><td>' + knobTxt[m] + '</td><td>' + fmt(a50.m) + '</td><td>' + fmt(a300.m) + '</td><td><b>' + fmt(a1k.m) + '</b> <span class="sd">±' + fmt(a1k.sd) + '</span></td><td>' + fmt(a1k.min, 0) + '</td><td>' + fmt(b1k.m) + ' <span class="sd">±' + fmt(b1k.sd) + '</span></td></tr>';
+    });
+    var cks = D.map(function (d) { return d.ckpt; });
+    rows += '<tr><td colspan="7" style="color:#5b6675;font-size:10px;text-align:left;border:0;padding-top:8px">' + QCL.ARCH_INFO[bench.arch].name + ' · ' + (bench.mode === 'tuned' ? 'tuned settings' : 'shared settings') + ' · n = ' + D.length + ' seeds · checkpoints ' + fmt(Math.min.apply(null, cks)) + '–' + fmt(Math.max.apply(null, cks)) + '% · mean ± sd across seeds</td></tr>';
+    $('bench-table').innerHTML = rows; drawPareto();
+  }
+  $('bench-table').innerHTML = '<tr><td style="color:#5b6675">Results appear here as seeds finish.</td></tr>';
+
+  // ---------- Pareto (final Task B vs final Task A) ----------
+  function drawPareto() {
+    var S = setupCanvas($('pareto')), ctx = S.ctx, w = S.w, h = S.h, pad = { l: 36, r: 10, t: 10, b: 30 };
+    var xa = 60, xb = 100, ya = 50, yb = 100;
+    var X = function (v) { return pad.l + (w - pad.l - pad.r) * (v - xa) / (xb - xa); }, Y = function (v) { return pad.t + (h - pad.t - pad.b) * (1 - (v - ya) / (yb - ya)); };
+    ctx.clearRect(0, 0, w, h); ctx.font = '10px Space Mono, monospace'; ctx.lineWidth = 1;
+    for (var v = ya; v <= yb; v += 10) { ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke(); ctx.fillStyle = '#5b6675'; ctx.fillText(v, 8, Y(v) + 3); }
+    for (v = xa; v <= xb; v += 10) { ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.beginPath(); ctx.moveTo(X(v), pad.t); ctx.lineTo(X(v), h - pad.b); ctx.stroke(); ctx.fillStyle = '#5b6675'; ctx.fillText(v, X(v) - 7, h - pad.b + 12); }
+    ctx.fillStyle = '#8b97a6'; ctx.fillText('Task B @1000 →', w - pad.r - 98, h - 4);
+    ctx.fillText('↑ Task A @1000', pad.l + 6, pad.t + 12);
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(234,179,8,.6)'; ctx.beginPath(); ctx.moveTo(pad.l, Y(QCL.MAJORITY_FLOOR)); ctx.lineTo(w - pad.r, Y(QCL.MAJORITY_FLOOR)); ctx.stroke(); ctx.setLineDash([]);
+    var pa = bench && benchResult ? bench.arch : curArch;
+    ctx.fillStyle = '#8b97a6'; ctx.fillText(QCL.ARCH_INFO[pa].name, w - pad.r - 8 - ctx.measureText(QCL.ARCH_INFO[pa].name).width, pad.t + 12);
+    METHODS.forEach(function (m) {
+      var t = STUDY.archs[pa].m[m], c = META[m].color;
+      ctx.globalAlpha = 0.55; ctx.fillStyle = c;
+      t.grid.forEach(function (p) { ctx.beginPath(); ctx.arc(X(Math.max(xa, p.B)), Y(Math.max(ya, p.A)), 2.6, 0, 7); ctx.fill(); });
+      ctx.globalAlpha = 0.9; ctx.strokeStyle = c; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(X(Math.max(xa, t.all.B)), Y(Math.max(ya, t.all.A)), 5, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+    if (benchResult) METHODS.forEach(function (m) {
+      var r = benchResult[m], px = X(Math.max(xa, r.B.m)), py = Y(Math.max(ya, r.A.m)), c = META[m].color;
+      ctx.strokeStyle = c; ctx.globalAlpha = 0.6; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, Y(Math.max(ya, r.A.m - r.A.sd))); ctx.lineTo(px, Y(Math.min(yb, r.A.m + r.A.sd))); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(X(Math.max(xa, r.B.m - r.B.sd)), py); ctx.lineTo(X(Math.min(xb, r.B.m + r.B.sd)), py); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill(); ctx.stroke();
+    });
+  }
+  (function () {
+    var lg = $('pareto-legend');
+    METHODS.forEach(function (m) { lg.appendChild(el('span', null, '<i style="border-color:' + META[m].color + ';' + (META[m].dash.length ? 'border-top-style:dashed' : '') + '"></i>' + META[m].name)); });
+    lg.appendChild(el('span', null, 'dots: study grid (12 seeds) · ring: tuned choice · large: your benchmark ± sd'));
+  })();
+
+  (function () {
+    var sel = $('arch');
+    ARCHS.forEach(function (an) { sel.appendChild(el('option', { value: an }, QCL.ARCH_INFO[an].name + ' · ' + QCL.ARCH_INFO[an].P + ' p')); });
+    sel.value = curArch;
+    sel.addEventListener('change', function () {
+      curArch = sel.value;
+      if (curArch !== 'qs3' && mode === 'manual') { mode = 'tuned'; $('mode').value = 'tuned'; $('knobs').classList.add('locked'); }
+      METHODS.forEach(function (m) { ['A', 'B'].forEach(function (h) { var c = fieldCtx[m][h]; c.fillStyle = '#05080d'; c.fillRect(0, 0, FIELD_N, FIELD_N); }); });
+      renderRefLines(); drawChart(); drawPareto(); drawArchChart(); updateThree();
+    });
+    $('mode').addEventListener('change', function () {
+      mode = this.value; $('knobs').classList.toggle('locked', mode === 'tuned');
+      renderRefLines(); drawChart(); drawPareto();
+    });
+  })();
+  window.addEventListener('resize', drawArchChart);
+  renderRefLines(); drawChart(); drawPareto(); drawArchChart(); updateThree();
+})();
+</script>
+</body>
+</html>
