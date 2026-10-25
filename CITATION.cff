@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+type: software
+title: "Shared readouts, not S³: what drives forgetting in a toy quaternion network"
+abstract: >-
+  A controlled study of catastrophic forgetting in small quaternion networks,
+  with a pilot on real images. In a toy problem, forgetting comes mostly from
+  reading tasks out of one shared output quaternion, not from constraining
+  weights to the unit sphere (S³); a further S³ cost from the amplitude ×
+  unit-quaternion factorization did not transfer to split digits. On split
+  digits, quaternion layers with per-task outputs forget less than real MLPs
+  of the same size. Includes reproducible JavaScript and Python engines, raw
+  results and an interactive browser workbench.
+authors:
+  - given-names: Billy
+    family-names: Moore
+version: 1.1.0
+doi: 10.5281/zenodo.23638141
+date-released: 2026-10-25
+license: MIT
+repository-code: "https://github.com/3moorebbb-sketch/quaternion-forgetting"
+url: "https://3moorebbb-sketch.github.io/quaternion-forgetting/"
+keywords:
+  - continual learning
+  - catastrophic forgetting
+  - quaternion neural networks
+  - weight normalization
+  - linear probing
