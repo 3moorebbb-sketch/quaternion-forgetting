@@ -16,8 +16,12 @@ authors:
 version: 1.0.0
 date-released: 2026-10-25
 license: MIT
-repository-code: "https://github.com/YOUR-USERNAME/quaternion-forgetting"
-url: "https://YOUR-USERNAME.github.io/quaternion-forgetting/"
+repository-code: "https://github.com/
+3moorebbb-sketch
+/quaternion-forgetting"
+url: "https://
+3moorebbb-sketch
+.github.io/quaternion-forgetting/"
 keywords:
   - continual learning
   - catastrophic forgetting
