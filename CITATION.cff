@@ -14,6 +14,7 @@ authors:
   - given-names: Billy
     family-names: Moore
 version: 1.0.0
+doi: 10.5281/zenodo.23638141
 date-released: 2026-10-25
 license: MIT
 repository-code: "https://github.com/3moorebbb-sketch/quaternion-forgetting"
