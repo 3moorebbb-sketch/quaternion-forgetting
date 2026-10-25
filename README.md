@@ -1,5 +1,7 @@
 # Shared readouts, not S³: what drives forgetting in a toy quaternion network
 
+[![DOI](https://zenodo.org/badge/1432961308.svg)](https://doi.org/10.5281/zenodo.23638141)
+
 **[Live workbench](https://3moorebbb-sketch.github.io/quaternion-forgetting/)** · **[Write-up (PDF)](paper.pdf)**
 
 Does putting a network's weights on the unit 3-sphere help it remember an old task while learning a new one? In this toy setting, no.
